@@ -67,18 +67,30 @@ export const parseChat = (rawText: string): ParsedMessage[] => {
       const timestamp = parseWhatsAppDateTime(dateStr, timeStr);
       let isSystem = !sender; // Initial check
 
-      // Refined system message check using keywords if no sender was found
-      if (isSystem && messageContent) {
-         const lowerMessageContent = messageContent.toLowerCase();
+      const trimmedMessageContent = messageContent.trim();
+      const lowerMessageContent = trimmedMessageContent.toLowerCase();
+
+      // Refined system message check:
+      // 1. No sender captured initially
+      // 2. Specific keywords found even if sender *was* captured (e.g., edited message)
+      // 3. Keywords found when no sender was captured
+      const isEditedMessage = lowerMessageContent === 'mensagem editada' || lowerMessageContent === '<mensagem editada>' || lowerMessageContent === 'message edited' || lowerMessageContent === '<message edited>';
+      
+      if (!isSystem && sender) { // Check even if sender exists
+        isSystem = isEditedMessage; 
+      } else if (isSystem && messageContent) { // Check keywords only if initially thought to be system
          isSystem = systemMessageKeywords.some(keyword => lowerMessageContent.includes(keyword));
       }
+      // Ensure edited messages are always marked as system, even if keywords didn't catch them initially
+      if (isEditedMessage) {
+        isSystem = true;
+      }
+
 
       currentMessage = {
         timestamp: timestamp,
-        // Use sender if captured, otherwise null (indicating system or unknown)
         sender: sender ? sender.trim() : null, 
-        message: messageContent.trim(),
-        // Refine system message detection later if needed (e.g., keywords)
+        message: trimmedMessageContent,
         isSystemMessage: isSystem, 
       };
       messages.push(currentMessage);

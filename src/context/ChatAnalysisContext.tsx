@@ -15,8 +15,8 @@ interface ChatAnalysisContextType {
   setIsLoading: (loading: boolean) => void;
   error: string | null;
   setError: (error: string | null) => void;
-  selectedChartView: 'hourly' | 'daily' | 'weekly';
-  setSelectedChartView: (view: 'hourly' | 'daily' | 'weekly') => void;
+  selectedChartView: 'daily' | 'weekly'; // Removed 'hourly'
+  setSelectedChartView: (view: 'daily' | 'weekly') => void; // Removed 'hourly'
   focusedSender: string | null;
   setFocusedSender: (sender: string | null) => void;
 }
@@ -33,7 +33,7 @@ export const ChatAnalysisProvider: React.FC<ChatAnalysisProviderProps> = ({ chil
   const [analysisResults, setAnalysisResults] = useState<AnalysisResults | null>(null); // Use AnalysisResults from analyzeChat
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedChartView, setSelectedChartView] = useState<'hourly' | 'daily' | 'weekly'>('hourly');
+  const [selectedChartView, setSelectedChartView] = useState<'daily' | 'weekly'>('daily'); // Changed default to 'daily'
   const [focusedSender, setFocusedSender] = useState<string | null>(null);
 
   const value = {
