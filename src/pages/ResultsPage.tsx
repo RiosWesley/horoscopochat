@@ -1,18 +1,26 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 // Add new icons
-import { Share2, Clock, Award, Star, Gift, MessageSquareText, Users, Laugh, HelpCircle as QuestionIcon, Text, TrendingUp, TrendingDown, UserCircle } from 'lucide-react'; 
+import { Share2, Clock, Award, Star, Gift, MessageSquareText, Users, Laugh, HelpCircle as QuestionIcon, Text, TrendingUp, TrendingDown, UserCircle, Palette, Calendar, Clock1 } from 'lucide-react'; 
 import { useChatAnalysis } from '@/context/ChatAnalysisContext';
 import GradientBackground from '@/components/GradientBackground';
 import ResultCard, { ShareButton } from '@/components/ResultCard';
 import { toast } from 'sonner';
 import FloatingEmoji from '@/components/FloatingEmoji';
+import SentimentChart from '@/components/SentimentChart';
+import ActivityHeatmap from '@/components/ActivityHeatmap';
+import ContactBubble from '@/components/ContactBubble';
+import EmojiCloud from '@/components/EmojiCloud';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import type { AnalysisResults } from '../lib/analyzeChat'; // Import type for clarity
 
 const ResultsPage = () => {
   const navigate = useNavigate();
   const [showPremium, setShowPremium] = useState(false);
+  const [timeOfDay, setTimeOfDay] = useState<string>('');
   const { analysisResults, isLoading, error } = useChatAnalysis(); // Removed parsedMessages as it's within analysisResults
 
   useEffect(() => {
@@ -23,11 +31,72 @@ const ResultsPage = () => {
     if (error) {
        toast.error(`Erro ao carregar resultados: ${error}`);
     }
+    
+    // Set time of day for greeting
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 12) setTimeOfDay('Bom dia');
+    else if (hour >= 12 && hour < 18) setTimeOfDay('Boa tarde');
+    else setTimeOfDay('Boa noite');
   }, [analysisResults, isLoading, error, navigate]);
+
+  // Enhanced mock data for better visualization
+  const mockHourlyActivity = Array(24).fill(0).map((_, i) => {
+    // Create a more realistic pattern - more activity during day, peak in morning and evening
+    if (i >= 8 && i <= 22) {
+      const baseFactor = i <= 12 ? i - 7 : 23 - i; // Higher in middle of day
+      return Math.floor(Math.random() * baseFactor * 15) + 5;
+    }
+    return Math.floor(Math.random() * 10); // Less activity at night
+  });
+
+  // Mock emojis with counts for visualization
+  const mockEmojis = [
+    { emoji: "😂", count: 47 },
+    { emoji: "👍", count: 35 },
+    { emoji: "❤️", count: 28 },
+    { emoji: "😭", count: 22 },
+    { emoji: "🤣", count: 18 },
+    { emoji: "🙏", count: 15 },
+    { emoji: "😊", count: 12 },
+    { emoji: "🥰", count: 10 },
+    { emoji: "😍", count: 8 },
+    { emoji: "👀", count: 7 },
+    { emoji: "🔥", count: 6 },
+    { emoji: "😅", count: 5 }
+  ];
+  
+  // Mock personality traits for visualization
+  const mockPersonalityTraits = {
+    "Extrovertido": 75,
+    "Emotivo": 60,
+    "Criativo": 85,
+    "Analítico": 45,
+    "Assertivo": 65
+  };
+  
+  // Mock common expressions
+  const mockExpressions = [
+    { text: "kkkk", count: 83 },
+    { text: "nossa", count: 42 },
+    { text: "enfim", count: 37 },
+    { text: "tipo", count: 31 },
+    { text: "vdd", count: 29 }
+  ];
 
   // Mock results data (for sections not yet implemented fully)
   const mockResults = {
-    prediction: "Altas chances de mandar um áudio de 3 minutos sem querer. Prepare-se!"
+    prediction: "Altas chances de mandar um áudio de 3 minutos sem querer. Prepare-se!",
+    title: "Seu Horóscopo de Chat!",
+    chatName: "Grupo da Faculdade",
+    messageCount: 3784,
+    firstMessageDate: "2023-06-15",
+    lastMessageDate: "2024-04-03",
+    activeDays: 178,
+    sentimentScores: {
+      positive: 65,
+      neutral: 25,
+      negative: 10
+    }
   };
 
   // Loading State
@@ -155,13 +224,14 @@ const ResultsPage = () => {
   // Generate heuristics based on actual results
   const { generatedSign, generatedSignoDescription, generatedFunFacts } = generateHeuristics(analysisResults);
 
-
   // --- Premium Upsell Logic ---
-  // (Remains the same)
   const handleShare = () => { toast.success('Em um app real, isto compartilharia uma imagem dos seus resultados!'); };
   const handlePremiumClick = () => setShowPremium(true);
   const handleBackToResults = () => setShowPremium(false);
   const handleSubscribe = () => { toast.success('Obrigado por se interessar! Em um app real, isto processaria sua assinatura.'); setTimeout(() => setShowPremium(false), 1500); };
+  
+  // Calculate timespan of chat
+  const timeSpan = `${new Date(mockResults.firstMessageDate).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' })} até ${new Date(mockResults.lastMessageDate).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' })}`;
   
   // Premium Screen JSX
   if (showPremium) {
@@ -197,8 +267,30 @@ const ResultsPage = () => {
   // Main Results Screen JSX
   return (
     <GradientBackground>
-      <div className="flex flex-col min-h-screen pb-20 px-4">
-        <h1 className="text-3xl font-bold text-center mt-8 mb-6">Seu Horóscopo de Chat!</h1>
+      <div className="flex flex-col min-h-screen pb-24 px-4 pt-6">
+        {/* Welcome Header */}
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <h2 className="text-lg font-medium opacity-80">{timeOfDay}, Astroanalista!</h2>
+            <h1 className="text-3xl font-bold">{mockResults.title}</h1>
+          </div>
+          <Badge variant="outline" className="bg-white/20">
+            <Calendar className="h-3.5 w-3.5 mr-1" />
+            <span className="text-xs">{mockResults.activeDays} dias</span>
+          </Badge>
+        </div>
+        
+        {/* Chat Info Strip */}
+        <div className="bg-white/10 rounded-xl p-3 mb-6 flex justify-between items-center">
+          <div>
+            <h3 className="font-medium">{mockResults.chatName}</h3>
+            <p className="text-xs opacity-70">{timeSpan}</p>
+          </div>
+          <div className="text-right">
+            <p className="font-bold">{mockResults.messageCount}</p>
+            <p className="text-xs opacity-70">mensagens</p>
+          </div>
+        </div>
 
         {/* --- Use Generated Sign --- */}
         <div className="cosmic-card bg-gradient-purple-pink text-white mb-8">
@@ -211,79 +303,149 @@ const ResultsPage = () => {
           </div>
         </div>
 
-        {/* --- Display Real Analysis Results --- */}
-        <ResultCard title="Visão Geral do Chat" variant="default">
-           <div className="space-y-3">
-             <div className="flex justify-between items-center"><span className="font-medium flex items-center"><MessageSquareText className="w-4 h-4 mr-2 opacity-70"/>Total de Mensagens:</span><span className="font-bold text-lg">{analysisResults.totalMessages}</span></div>
-             <div className="flex justify-between items-center"><span className="font-medium flex items-center"><Text className="w-4 h-4 mr-2 opacity-70"/>Tamanho Médio:</span><span className="font-bold text-lg">{analysisResults.averageMessageLength} <span className="text-xs opacity-70">caracteres</span></span></div>
-             {analysisResults.mostFrequentKeywordCategory === 'laughter' && (<p className="text-sm opacity-80 pt-1 flex items-center"><Laugh className="w-4 h-4 mr-1 text-yellow-500"/> Clima geral: Descontraído</p>)}
-             {analysisResults.mostFrequentKeywordCategory === 'questions' && (<p className="text-sm opacity-80 pt-1 flex items-center"><QuestionIcon className="w-4 h-4 mr-1 text-blue-500"/> Clima geral: Investigativo</p>)}
-           </div>
-        </ResultCard>
-
-        {/* --- Per-Sender Analysis --- */}
-        {Object.keys(analysisResults.statsPerSender).length > 1 && ( // Show only for group chats
-          <ResultCard title="Análise por Participante" variant="secondary">
-            <div className="space-y-4">
-              {Object.entries(analysisResults.statsPerSender)
-                .sort(([, statsA], [, statsB]) => statsB.messageCount - statsA.messageCount) // Sort by message count
-                .map(([sender, stats]) => {
-                  const senderSentimentRatio = stats.keywordCounts.positive / (stats.keywordCounts.negative + 1);
-                  return (
-                    <div key={sender} className="border-b border-gray-300/30 pb-3 last:border-b-0">
-                      <h4 className="font-semibold mb-1 flex items-center"><UserCircle className="w-4 h-4 mr-2 opacity-70"/>{sender}</h4>
-                      <div className="flex justify-between text-xs opacity-80">
-                        <span>{stats.messageCount} msg{stats.messageCount > 1 ? 's' : ''}</span>
-                        <span>Média: {stats.averageLength} chars</span>
-                        <span>
-                          {/* Remove invalid title prop */}
-                          {senderSentimentRatio > 1.5 ? <TrendingUp className="w-4 h-4 inline text-green-400" /> : 
-                           senderSentimentRatio < 0.7 ? <TrendingDown className="w-4 h-4 inline text-red-400" /> : null}
-                        </span>
-                      </div>
-                    </div>
-                  );
-              })}
+        {/* People Card */}
+        <ResultCard title="Quem Participa" variant="primary">
+          {Object.entries(analysisResults.messagesPerSender).length > 0 ? (
+            <div className="flex gap-4 overflow-x-auto pb-2 px-2">
+              {Object.entries(analysisResults.messagesPerSender)
+                .sort(([, countA], [, countB]) => countB - countA)
+                .map(([name, count], index) => (
+                  <ContactBubble key={index} name={name} messageCount={count} />
+                ))}
             </div>
-          </ResultCard>
-        )}
-
-        {/* --- Personality Mix based on Keywords --- */}
-        <ResultCard title="Mix de Vibrações" variant="default">
-          {(analysisResults.keywordCounts.positive > 0 || analysisResults.keywordCounts.negative > 0) ? (
-            <div className="space-y-2">
-              <div className="flex items-center mb-2"><span className="mr-2 opacity-80">Balanço Energético:</span></div>
-              <div className="w-full bg-gray-200 rounded-full h-6 flex overflow-hidden">
-                {analysisResults.keywordCounts.positive > 0 && (<div className="h-6 bg-gradient-to-r from-green-400 to-emerald-500 flex items-center justify-center text-xs text-white font-medium" style={{ width: `${(analysisResults.keywordCounts.positive / (analysisResults.keywordCounts.positive + analysisResults.keywordCounts.negative)) * 100}%` }} title={`Positivas: ${analysisResults.keywordCounts.positive}`}>Positiva</div>)}
-                {analysisResults.keywordCounts.negative > 0 && (<div className="h-6 bg-gradient-to-r from-red-400 to-rose-500 flex items-center justify-center text-xs text-white font-medium" style={{ width: `${(analysisResults.keywordCounts.negative / (analysisResults.keywordCounts.positive + analysisResults.keywordCounts.negative)) * 100}%` }} title={`Negativas: ${analysisResults.keywordCounts.negative}`}>Negativa</div>)}
-              </div>
-              <p className="text-xs text-center opacity-70 pt-1">Baseado na contagem de palavras-chave positivas e negativas.</p>
-            </div>
-          ) : (<p className="text-sm opacity-70 text-center py-4">Não foi possível determinar o balanço de vibrações.</p>)}
+          ) : (
+            <p className="text-sm opacity-70 text-center py-3">Não foi possível identificar os participantes.</p>
+          )}
         </ResultCard>
         
-        {/* --- Destaques Card --- */}
-        <ResultCard title="Destaques do Chat" variant="primary">
+        {/* Activity Heatmap Card */}
+        <ResultCard title="Quando Você Mais Conversa" variant="accent">
+          <ActivityHeatmap hourlyActivity={mockHourlyActivity} />
+          <div className="mt-4 flex items-center justify-center space-x-2">
+            <div className="bg-gradient-to-r from-indigo-500 to-purple-500 w-3 h-3 rounded"></div>
+            <span className="text-xs">Madrugada</span>
+            <div className="bg-gradient-to-r from-blue-400 to-cyan-300 w-3 h-3 rounded"></div>
+            <span className="text-xs">Manhã</span>
+            <div className="bg-gradient-to-r from-yellow-400 to-orange-400 w-3 h-3 rounded"></div>
+            <span className="text-xs">Tarde</span>
+            <div className="bg-gradient-to-r from-purple-800 to-indigo-900 w-3 h-3 rounded"></div>
+            <span className="text-xs">Noite</span>
+          </div>
+        </ResultCard>
+        
+        {/* Emoji Cloud */}
+        <ResultCard title="Seu Universo de Emoji" variant="secondary">
+          <EmojiCloud emojis={mockEmojis} />
+        </ResultCard>
+        
+        {/* Sentiment Analysis */}
+        <ResultCard title="Equilíbrio Emocional" variant="default">
+          <SentimentChart 
+            positive={mockResults.sentimentScores.positive} 
+            neutral={mockResults.sentimentScores.neutral}
+            negative={mockResults.sentimentScores.negative}
+          />
+          
+          <div className="mt-4 text-center">
+            <p className="text-sm">Sua conversa tem um tom majoritariamente <span className="font-bold text-emerald-500">positivo</span>!</p>
+          </div>
+        </ResultCard>
+
+        {/* Word Usage and Expressions */}
+        <ResultCard title="Suas Expressões Favoritas" variant="primary">
           <div className="space-y-4">
-            {analysisResults.mostFrequentEmoji ? (<> <div className="flex justify-between items-center"><span className="font-medium">Emoji Principal:</span><span className="text-4xl">{analysisResults.mostFrequentEmoji}</span></div> <p className="text-sm">Seu espírito animal digital é o {analysisResults.mostFrequentEmoji}!</p> </>) : (<p className="text-sm opacity-70">Nenhum emoji frequente encontrado.</p>)}
-            {analysisResults.mostActiveHour !== null ? (<> <div className="flex items-center"><Clock className="h-5 w-5 mr-2" /><span className="font-medium">Horário Nobre: </span><span className="ml-2 bg-white/30 px-2 py-0.5 rounded font-bold">{`${analysisResults.mostActiveHour.toString().padStart(2, '0')}:00 - ${(analysisResults.mostActiveHour + 1).toString().padStart(2, '0')}:00`}</span></div> <p className="text-sm">Sua energia de chat bomba entre <strong>{analysisResults.mostActiveHour}:00</strong> e <strong>{(analysisResults.mostActiveHour + 1)}:00</strong>.</p> </>) : (<p className="text-sm opacity-70">Não foi possível determinar o horário nobre.</p>)}
-            {analysisResults.favoriteWord ? (<div className="flex justify-between items-center pt-2"><span className="font-medium">Palavra Favorita:</span><span className="bg-white/30 px-3 py-1 rounded-full font-bold">{analysisResults.favoriteWord}</span></div>) : (<div className="flex justify-between items-center pt-2"><span className="font-medium">Palavra Favorita:</span><span className="text-sm opacity-70">Nenhuma palavra marcante encontrada.</span></div>)}
+            {mockExpressions.length > 0 ? (
+              <div className="flex flex-wrap gap-2 justify-center">
+                {mockExpressions.map((exp, index) => (
+                  <div key={index} className="bg-white/20 rounded-full px-3 py-1.5 text-sm font-medium">
+                    {exp.text} <span className="opacity-70 text-xs">({exp.count}x)</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm opacity-70 text-center">Nenhuma expressão recorrente encontrada.</p>
+            )}
+            
+            <Separator className="bg-white/20" />
+            
+            {analysisResults.favoriteWord ? (
+              <div className="text-center">
+                <p className="text-sm opacity-80">Sua palavra favorita é:</p>
+                <div className="inline-block bg-gradient-to-r from-cosmic-pink to-cosmic-purple text-white font-bold px-4 py-2 rounded-full mt-2">
+                  {analysisResults.favoriteWord}
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm opacity-70 text-center">Nenhuma palavra favorita identificada.</p>
+            )}
+          </div>
+        </ResultCard>
+
+        {/* Personality Traits */}
+        <ResultCard title="Seus Traços de Personalidade" variant="secondary">
+          <div className="space-y-4">
+            {Object.entries(mockPersonalityTraits).map(([trait, score]) => (
+              <div key={trait} className="space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span>{trait}</span>
+                  <span className="font-medium">{score}%</span>
+                </div>
+                <div className="w-full bg-white/20 rounded-full h-2.5">
+                  <div 
+                    className="h-2.5 rounded-full bg-gradient-to-r from-cosmic-neonBlue to-cosmic-purple"
+                    style={{ width: `${score}%` }}
+                  ></div>
+                </div>
+              </div>
+            ))}
           </div>
         </ResultCard>
         
         {/* --- Fun Facts Card --- */}
-        <ResultCard title="Pequenas Verdades Cósmicas" variant="secondary">
-           {generatedFunFacts.length > 0 ? (<ul className="space-y-3">{generatedFunFacts.map((fact, index) => (<li key={index} className="flex items-start"><span className="mr-2 text-lg">•</span><span>{fact}</span></li>))}</ul>) : (<p className="text-sm opacity-70 text-center py-4">Nenhuma verdade cósmica encontrada por enquanto.</p>)}
+        <ResultCard title="Pequenas Verdades Cósmicas" variant="accent">
+           {generatedFunFacts.length > 0 ? (
+            <ul className="space-y-3">
+              {generatedFunFacts.map((fact, index) => (
+                <li key={index} className="flex items-start">
+                  <span className="mr-2 text-lg">•</span>
+                  <span>{fact}</span>
+                </li>
+              ))}
+            </ul>
+           ) : (
+            <p className="text-sm opacity-70 text-center py-4">
+              Nenhuma verdade cósmica encontrada por enquanto.
+            </p>
+           )}
         </ResultCard>
         
         {/* --- Prediction Card --- */}
-        <ResultCard title="Previsão da Semana" variant="accent">
-          <div className="flex items-center"><FloatingEmoji emoji="🔮" size="lg" /><p className="ml-4">{mockResults.prediction}</p></div>
+        <ResultCard title="Previsão da Semana" variant="default">
+          <div className="flex items-center">
+            <FloatingEmoji emoji="🔮" size="lg" />
+            <p className="ml-4">{mockResults.prediction}</p>
+          </div>
         </ResultCard>
         
         {/* --- Premium Button & Footer --- */}
-        <div className="mt-8 mb-4"><Button onClick={handlePremiumClick} className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-white font-semibold py-4 rounded-xl shadow-lg">Desbloqueie Análises Premium ✨</Button></div>
-        <p className="text-center text-sm opacity-70 mb-16">Analise outro chat para descobrir mais personalidades!</p>
+        <div className="mt-8 mb-4">
+          <Button 
+            onClick={handlePremiumClick} 
+            className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-white font-semibold py-4 rounded-xl shadow-lg"
+          >
+            Desbloqueie Análises Premium ✨
+          </Button>
+        </div>
+        
+        <div className="flex justify-center space-x-4 mb-16">
+          <Button variant="outline" size="sm" className="border-white/30 bg-white/10 text-sm">
+            Analisar Outro Chat
+          </Button>
+          <Button variant="outline" size="sm" className="border-white/30 bg-white/10 text-sm">
+            Ver Tutorial
+          </Button>
+        </div>
+        
         <ShareButton onClick={handleShare} />
       </div>
     </GradientBackground>
