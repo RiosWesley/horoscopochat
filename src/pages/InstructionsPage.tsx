@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, MessageSquare, MoreVertical, Download, Upload, HelpCircle } from 'lucide-react';
+import { useChatAnalysis } from '@/context/ChatAnalysisContext'; // Import the context hook
 import GradientBackground from '@/components/GradientBackground';
 import StepIndicator from '@/components/StepIndicator';
 import { toast } from 'sonner';
@@ -10,6 +11,8 @@ import { toast } from 'sonner';
 const InstructionsPage = () => {
   const navigate = useNavigate();
   const [file, setFile] = useState<File | null>(null);
+  // Get setters from the context
+  const { setRawChatText, setIsLoading, setError } = useChatAnalysis(); 
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0] || null;
@@ -26,8 +29,32 @@ const InstructionsPage = () => {
   
   const handleSubmit = () => {
     if (file) {
-      // In a real app, we would process the file here
-      navigate('/analyzing');
+      setIsLoading(true); // Set loading state
+      setError(null); // Clear previous errors
+      
+      const reader = new FileReader();
+      
+      reader.onload = (event) => {
+        const text = event.target?.result;
+        if (typeof text === 'string') {
+          setRawChatText(text); // Store raw text in context
+          setIsLoading(false);
+          navigate('/analyzing'); // Navigate after successful read
+        } else {
+          setError('Falha ao ler o conteúdo do arquivo.');
+          setIsLoading(false);
+          toast.error('Não foi possível ler o conteúdo do arquivo.');
+        }
+      };
+      
+      reader.onerror = () => {
+        setError('Erro ao ler o arquivo.');
+        setIsLoading(false);
+        toast.error('Ocorreu um erro ao tentar ler o arquivo.');
+      };
+      
+      reader.readAsText(file); // Read the file as text
+      
     } else {
       toast.error('Por favor, selecione um arquivo de chat para continuar');
     }
