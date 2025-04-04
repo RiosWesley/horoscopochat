@@ -1,7 +1,7 @@
 import React, { createContext, useState, useContext, ReactNode } from 'react';
 import { ParsedMessage } from '../lib/parseChat'; // Correct: ParsedMessage comes from parseChat
 // Import the full type definition from the source file
-import type { AnalysisResults } from '../lib/analyzeChat'; // Correct: AnalysisResults comes from analyzeChat
+import type { AnalysisResults } from '../lib/analyzeChat'; // Correct: AnalysisResults comes from analyzeChat. REMOVED ParsedMessage import from here.
 
 interface ChatAnalysisContextType {
   rawChatText: string | null;

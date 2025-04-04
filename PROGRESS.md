@@ -29,10 +29,12 @@ Create a functional web application that analyzes uploaded WhatsApp chat `.txt` 
     *   [X] Implement simple heuristic rules for generating insights (Signo, Pequenas Verdades) in `ResultsPage.tsx`.
     *   [X] Refine heuristics to incorporate punctuation/CAPS data.
     *   [X] Further refine heuristics for more varied/combined insights (Signo combination, talkative person fact).
+    *   [X] Implement common expression (bigram) analysis.
+    *   [X] Implement response time analysis per sender.
 4.  **State Management (React Context):**
     *   [X] Set up `ChatAnalysisContext` to hold raw text, parsed messages, analysis results, and loading state.
     *   [X] Use specific types (`ParsedMessage`, `AnalysisResults`).
-    *   [X] Update `AnalysisResults` interface with new fields (keywords, avg length, favoriteWord, punctuation, CAPS).
+    *   [X] Update `AnalysisResults` interface with new fields (keywords, avg length, favoriteWord, punctuation, CAPS, expressions).
 5.  **Page Updates:**
     *   [X] Update `AnalyzingPage` to trigger parsing and analysis, update Context, and navigate.
     *   [X] Update `ResultsPage` to display basic analysis results (total messages, sender counts) from Context, including loading/error states.
@@ -45,6 +47,12 @@ Create a functional web application that analyzes uploaded WhatsApp chat `.txt` 
     *   [X] Add Signo description generation and display.
     *   [X] Add per-sender analysis calculation in `analyzeChat.ts`.
     *   [X] Add per-sender analysis display section in `ResultsPage.tsx`.
+    *   [X] Connect ActivityHeatmap to real data.
+    *   [X] Connect SentimentChart to real data (positive/negative keywords).
+    *   [X] Connect Chat Info Strip to real message count, active days, and date range.
+    *   [X] Remove mock Personality Traits section.
+    *   [X] Connect Expressions section to real data.
+    *   [X] Add response time display to per-sender analysis in `ResultsPage.tsx`.
 6.  **UI Components & Visualization:**
     *   [X] Create `ContactBubble` component to display sender names and message counts.
     *   [X] Create `SentimentChart` component using Recharts for displaying sentiment analysis.
@@ -60,9 +68,6 @@ Create a functional web application that analyzes uploaded WhatsApp chat `.txt` 
 
 ## Next Steps
 
-*   Implement actual emoji analysis instead of using mock data.
-*   Add more detailed per-user analysis.
-*   Consider adding more analysis types (e.g., response times if possible, specific phrase tracking).
 *   Further refine chat parsing for any remaining edge cases if needed.
 *   Implement backend functionality for storing and retrieving analysis results.
 *   Add social sharing functionality to generate shareable images.
@@ -70,4 +75,3 @@ Create a functional web application that analyzes uploaded WhatsApp chat `.txt` 
 
 ---
 *This file will be updated as development progresses.*
-
