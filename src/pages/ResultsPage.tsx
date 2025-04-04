@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-// Add new icons
-import { Share2, Clock, Award, Star, Gift, MessageSquareText, Users, Laugh, HelpCircle as QuestionIcon, Text, TrendingUp, TrendingDown, UserCircle, Palette, Calendar, Clock1, Smile, Zap } from 'lucide-react'; 
+import { Share2, Clock, Award, Star, Gift, MessageSquareText, Users, Laugh, HelpCircle as QuestionIcon, Text, TrendingUp, TrendingDown, UserCircle, Palette, Calendar, Clock1, Smile, Zap, BarChart, PieChart, LineChart } from 'lucide-react'; 
 import { useChatAnalysis } from '@/context/ChatAnalysisContext';
 import GradientBackground from '@/components/GradientBackground';
 import ResultCard, { ShareButton } from '@/components/ResultCard';
@@ -14,15 +13,15 @@ import ContactBubble from '@/components/ContactBubble';
 import EmojiCloud from '@/components/EmojiCloud';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import type { AnalysisResults, SenderStats } from '../lib/analyzeChat'; // Import types for clarity
-import type { ParsedMessage } from '../lib/parseChat'; // Import ParsedMessage type
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import SenderFocus from '@/components/SenderFocus';
+import type { AnalysisResults, SenderStats } from '../lib/analyzeChat';
+import type { ParsedMessage } from '../lib/parseChat';
 
-// Helper function to find top item in a record
 const findTopItem = (record: Record<string, number>): string | null => {
   let topItem: string | null = null;
   let maxCount = 0;
   for (const item in record) {
-    // Ensure the item itself is not empty and count is positive
     if (item && record[item] > 0 && record[item] > maxCount) { 
       maxCount = record[item];
       topItem = item;
@@ -31,7 +30,6 @@ const findTopItem = (record: Record<string, number>): string | null => {
   return topItem;
 };
 
-// Helper to format keyword category names nicely
 const formatKeywordCategory = (category: string | null): string | null => {
   if (!category) return null;
   switch (category) {
@@ -43,33 +41,38 @@ const formatKeywordCategory = (category: string | null): string | null => {
   }
 };
 
-
 const ResultsPage = () => {
   const navigate = useNavigate();
   const [showPremium, setShowPremium] = useState(false);
   const [timeOfDay, setTimeOfDay] = useState<string>('');
-  // Get parsedMessages from context as well
-  const { analysisResults, parsedMessages, isLoading, error } = useChatAnalysis(); 
+  const { 
+    analysisResults, 
+    parsedMessages, 
+    isLoading, 
+    error, 
+    selectedChartView, 
+    setSelectedChartView,
+    focusedSender,
+    setFocusedSender 
+  } = useChatAnalysis();
+  
   const [calculatedDates, setCalculatedDates] = useState<{ activeDays: number; timeSpan: string }>({ activeDays: 0, timeSpan: 'Período Indefinido' });
 
   useEffect(() => {
-    // Calculate dates when parsedMessages are available
     if (parsedMessages && parsedMessages.length > 0) {
       const validTimestamps = parsedMessages
         .map(msg => msg.timestamp)
-        .filter((ts): ts is Date => ts !== null) // Type guard to filter out nulls
-        .sort((a, b) => a.getTime() - b.getTime()); // Sort timestamps chronologically
+        .filter((ts): ts is Date => ts !== null)
+        .sort((a, b) => a.getTime() - b.getTime());
 
       if (validTimestamps.length > 0) {
         const firstDate = validTimestamps[0];
         const lastDate = validTimestamps[validTimestamps.length - 1];
         
-        // Calculate active days (difference + 1 day)
         const diffTime = Math.abs(lastDate.getTime() - firstDate.getTime());
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        const activeDays = diffDays + 1; // Add 1 because even one day is active
+        const activeDays = diffDays + 1;
 
-        // Format timespan
         const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: '2-digit', day: '2-digit' };
         const timeSpan = `${firstDate.toLocaleDateString('pt-BR', options)} - ${lastDate.toLocaleDateString('pt-BR', options)}`;
         
@@ -81,7 +84,6 @@ const ResultsPage = () => {
        setCalculatedDates({ activeDays: 0, timeSpan: 'Nenhuma mensagem válida' });
     }
 
-    // Existing logic for navigation and error handling
     if (!isLoading && !analysisResults && !error) {
       toast.error("Nenhum resultado de análise encontrado.");
       navigate('/instructions');
@@ -94,7 +96,7 @@ const ResultsPage = () => {
     if (hour >= 5 && hour < 12) setTimeOfDay('Bom dia');
     else if (hour >= 12 && hour < 18) setTimeOfDay('Boa tarde');
     else setTimeOfDay('Boa noite');
-  }, [analysisResults, parsedMessages, isLoading, error, navigate]); // Add parsedMessages to dependency array
+  }, [analysisResults, parsedMessages, isLoading, error, navigate]);
 
   const mockResults = { // Keep prediction and title, remove others
     prediction: "Altas chances de mandar um áudio de 3 minutos sem querer. Prepare-se!",
@@ -103,7 +105,6 @@ const ResultsPage = () => {
   
   const genericChatName = "Sua Conversa"; // Use generic name
 
-  // Loading State
   if (isLoading) { /* ... loading JSX ... */ 
     return (
       <GradientBackground>
@@ -114,7 +115,6 @@ const ResultsPage = () => {
     );
   }
 
-  // Error State or Missing Results
   if (error || !analysisResults) { /* ... error JSX ... */ 
      return (
       <GradientBackground> 
@@ -129,7 +129,6 @@ const ResultsPage = () => {
      );
   }
 
-  // --- Heuristic Generation ---
   const generateHeuristics = (results: NonNullable<AnalysisResults>) => {
     let sign = "Explorador do ZapVerso ✨";
     let signDescriptor = "";
@@ -194,10 +193,13 @@ const ResultsPage = () => {
   const handleBackToResults = () => setShowPremium(false);
   const handleSubscribe = () => { toast.success('Obrigado por se interessar! Em um app real, isto processaria sua assinatura.'); setTimeout(() => setShowPremium(false), 1500); };
   
-  // Use calculated dates from state
+  const handleSenderClick = (sender: string) => {
+    setFocusedSender(sender);
+    toast.info(`Analisando ${sender}...`);
+  };
+
   const { activeDays, timeSpan } = calculatedDates; 
 
-  // Premium Screen JSX
   if (showPremium) { /* ... premium JSX ... */ 
     return (
       <GradientBackground variant="warm">
@@ -228,25 +230,19 @@ const ResultsPage = () => {
     );
   }
   
-  // Main Results Screen JSX
   return (
     <GradientBackground>
       <div className="flex flex-col min-h-screen pb-24 px-4 pt-6">
-        {/* Welcome Header */}
         <div className="flex justify-between items-center mb-4">
           <div><h2 className="text-lg font-medium opacity-80">{timeOfDay}, Astroanalista!</h2><h1 className="text-3xl font-bold">{mockResults.title}</h1></div>
-          {/* Use calculated activeDays */}
           <Badge variant="outline" className="bg-white/20"><Calendar className="h-3.5 w-3.5 mr-1" /><span className="text-xs">{activeDays} dia{activeDays !== 1 ? 's' : ''}</span></Badge> 
         </div>
         
-        {/* Chat Info Strip */}
         <div className="bg-white/10 rounded-xl p-3 mb-6 flex justify-between items-center">
-          {/* Use genericChatName and calculated timeSpan */}
           <div><h3 className="font-medium">{genericChatName}</h3><p className="text-xs opacity-70">{timeSpan}</p></div> 
           <div className="text-right"><p className="font-bold">{analysisResults.totalMessages}</p><p className="text-xs opacity-70">mensagens</p></div>
         </div>
 
-        {/* Signo Card */}
         <div className="cosmic-card bg-gradient-purple-pink text-white mb-8">
           <div className="text-center">
             <FloatingEmoji emoji="✨" size="md" /><h2 className="text-2xl font-bold my-2">{generatedSign}</h2> 
@@ -255,7 +251,59 @@ const ResultsPage = () => {
           </div>
         </div>
 
-        {/* Visão Geral Card */}
+        <ResultCard title="Participantes" variant="primary">
+          <div className="space-y-4">
+            <p className="text-sm opacity-80 mb-2">Clique em um participante para ver detalhes:</p>
+            <div className="flex flex-wrap gap-2 justify-center">
+              {Object.entries(analysisResults.statsPerSender)
+                .sort(([, statsA], [, statsB]) => statsB.messageCount - statsA.messageCount)
+                .map(([sender, stats]) => (
+                  <div 
+                    key={sender} 
+                    className="cursor-pointer transition-transform hover:scale-105" 
+                    onClick={() => handleSenderClick(sender)}
+                  >
+                    <ContactBubble 
+                      name={sender} 
+                      messageCount={stats.messageCount}
+                      messageRatio={stats.messageCount / analysisResults.totalMessages}
+                      highlight={sender === focusedSender}
+                    />
+                  </div>
+                ))}
+            </div>
+          </div>
+        </ResultCard>
+
+        <ResultCard title="Atividade do Chat" variant="default">
+          <div className="space-y-4">
+            <div className="flex justify-center mb-2">
+              <ToggleGroup type="single" value={selectedChartView} onValueChange={(value) => value && setSelectedChartView(value as any)}>
+                <ToggleGroupItem value="hourly" aria-label="Hourly View" className="flex gap-1 items-center">
+                  <BarChart className="h-3.5 w-3.5" /> Horas
+                </ToggleGroupItem>
+                <ToggleGroupItem value="daily" aria-label="Daily View" className="flex gap-1 items-center" disabled>
+                  <LineChart className="h-3.5 w-3.5" /> Dias
+                </ToggleGroupItem>
+                <ToggleGroupItem value="weekly" aria-label="Weekly View" className="flex gap-1 items-center" disabled>
+                  <PieChart className="h-3.5 w-3.5" /> Semanas
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+
+            {selectedChartView === 'hourly' && (
+              <ActivityHeatmap hourlyActivity={Object.values(analysisResults.peakHours)} />
+            )}
+            
+            {(selectedChartView === 'daily' || selectedChartView === 'weekly') && (
+              <div className="flex flex-col items-center justify-center py-10 opacity-70">
+                <Badge variant="outline" className="mb-2">Premium</Badge>
+                <p className="text-sm text-center">A visualização por dias e semanas está disponível apenas na versão premium.</p>
+              </div>
+            )}
+          </div>
+        </ResultCard>
+
         <ResultCard title="Visão Geral do Chat" variant="default">
            <div className="space-y-3">
              <div className="flex justify-between items-center"><span className="font-medium flex items-center"><MessageSquareText className="w-4 h-4 mr-2 opacity-70"/>Total de Mensagens:</span><span className="font-bold text-lg">{analysisResults.totalMessages}</span></div>
@@ -265,7 +313,6 @@ const ResultsPage = () => {
            </div>
         </ResultCard>
 
-        {/* Per-Sender Analysis Card */}
         {Object.keys(analysisResults.statsPerSender).length > 1 && (
           <ResultCard title="Análise por Participante" variant="secondary">
             <div className="space-y-4">
@@ -277,7 +324,11 @@ const ResultsPage = () => {
                   const topSenderKeywordCat = findTopItem(stats.keywordCounts);
                   
                   return (
-                    <div key={sender} className="border-b border-gray-300/30 pb-3 last:border-b-0">
+                    <div 
+                      key={sender} 
+                      className={`border-b border-gray-300/30 pb-3 last:border-b-0 hover:bg-white/5 rounded-md p-2 transition-colors cursor-pointer ${sender === focusedSender ? 'bg-white/10' : ''}`}
+                      onClick={() => handleSenderClick(sender)}
+                    >
                       <h4 className="font-semibold mb-1 flex items-center"><UserCircle className="w-4 h-4 mr-2 opacity-70"/>{sender}</h4>
                       <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs opacity-80">
                         <span>{stats.messageCount} msg{stats.messageCount > 1 ? 's' : ''}</span>
@@ -300,7 +351,6 @@ const ResultsPage = () => {
           </ResultCard>
         )}
 
-        {/* Mix de Vibrações Card */}
         <ResultCard title="Mix de Vibrações" variant="default">
           {(analysisResults.keywordCounts.positive > 0 || analysisResults.keywordCounts.negative > 0) ? (
             <div className="space-y-2">
@@ -314,7 +364,6 @@ const ResultsPage = () => {
           ) : (<p className="text-sm opacity-70 text-center py-4">Não foi possível determinar o balanço de vibrações.</p>)}
         </ResultCard>
         
-        {/* Word Usage and Expressions */}
         <ResultCard title="Suas Expressões Favoritas" variant="primary">
           <div className="space-y-4">
             {analysisResults.topExpressions.length > 0 ? (
@@ -344,7 +393,6 @@ const ResultsPage = () => {
           </div>
         </ResultCard>
 
-        {/* Destaques Card */}
         <ResultCard title="Destaques do Chat" variant="primary">
           <div className="space-y-4">
             {analysisResults.mostFrequentEmoji ? (<> <div className="flex justify-between items-center"><span className="font-medium">Emoji Principal:</span><span className="text-4xl">{analysisResults.mostFrequentEmoji}</span></div> <p className="text-sm">Seu espírito animal digital é o {analysisResults.mostFrequentEmoji}!</p> </>) : (<p className="text-sm opacity-70">Nenhum emoji frequente encontrado.</p>)}
@@ -353,26 +401,30 @@ const ResultsPage = () => {
           </div>
         </ResultCard>
 
-        {/* Emoji Cloud Card */}
         <ResultCard title="Seu Universo de Emoji" variant="secondary">
           <EmojiCloud emojis={emojiCloudData} /> 
         </ResultCard>
         
-        {/* Fun Facts Card */}
         <ResultCard title="Pequenas Verdades Cósmicas" variant="accent">
            {generatedFunFacts.length > 0 ? (<ul className="space-y-3">{generatedFunFacts.map((fact, index) => (<li key={index} className="flex items-start"><span className="mr-2 text-lg">•</span><span>{fact}</span></li>))}</ul>) : (<p className="text-sm opacity-70 text-center py-4">Nenhuma verdade cósmica encontrada por enquanto.</p>)}
         </ResultCard>
         
-        {/* Prediction Card */}
         <ResultCard title="Previsão da Semana" variant="default">
-          <div className="flex items-center"><FloatingEmoji emoji="🔮" size="lg" /><p className="ml-4">{mockResults.prediction}</p></div>
+          <div className="flex items-center"><FloatingEmoji emoji="🔮" size="lg" animated={true} /><p className="ml-4">{mockResults.prediction}</p></div>
         </ResultCard>
         
-        {/* Premium Button & Footer */}
         <div className="mt-8 mb-4"><Button onClick={handlePremiumClick} className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-white font-semibold py-4 rounded-xl shadow-lg">Desbloqueie Análises Premium ✨</Button></div>
         <div className="flex justify-center space-x-4 mb-16"><Button variant="outline" size="sm" className="border-white/30 bg-white/10 text-sm">Analisar Outro Chat</Button><Button variant="outline" size="sm" className="border-white/30 bg-white/10 text-sm">Ver Tutorial</Button></div>
         <ShareButton onClick={handleShare} />
       </div>
+
+      {focusedSender && analysisResults.statsPerSender[focusedSender] && (
+        <SenderFocus 
+          sender={focusedSender} 
+          stats={analysisResults.statsPerSender[focusedSender]} 
+          onClose={() => setFocusedSender(null)}
+        />
+      )}
     </GradientBackground>
   );
 };

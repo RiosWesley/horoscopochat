@@ -35,6 +35,8 @@ Create a functional web application that analyzes uploaded WhatsApp chat `.txt` 
     *   [X] Set up `ChatAnalysisContext` to hold raw text, parsed messages, analysis results, and loading state.
     *   [X] Use specific types (`ParsedMessage`, `AnalysisResults`).
     *   [X] Update `AnalysisResults` interface with new fields (keywords, avg length, favoriteWord, punctuation, CAPS, expressions).
+    *   [X] Add chart view selection state for different time period displays.
+    *   [X] Add focused sender state for detailed sender analysis view.
 5.  **Page Updates:**
     *   [X] Update `AnalyzingPage` to trigger parsing and analysis, update Context, and navigate.
     *   [X] Update `ResultsPage` to display basic analysis results (total messages, sender counts) from Context, including loading/error states.
@@ -53,6 +55,9 @@ Create a functional web application that analyzes uploaded WhatsApp chat `.txt` 
     *   [X] Remove mock Personality Traits section.
     *   [X] Connect Expressions section to real data.
     *   [X] Add response time display to per-sender analysis in `ResultsPage.tsx`.
+    *   [X] Add detailed sender focus view for deep-diving into individual participants.
+    *   [X] Enhance context with view controls for different chart periods and focused sender state.
+    *   [X] Fix FloatingEmoji component to support non-animated mode.
 6.  **UI Components & Visualization:**
     *   [X] Create `ContactBubble` component to display sender names and message counts.
     *   [X] Create `SentimentChart` component using Recharts for displaying sentiment analysis.
@@ -65,13 +70,18 @@ Create a functional web application that analyzes uploaded WhatsApp chat `.txt` 
     *   [X] Add personality traits visualization section.
     *   [X] Improve visual styling of result cards and sections.
     *   [X] Add premium feature teaser and share functionality.
+    *   [X] Create SenderFocus component for detailed analysis of individual chat participants.
+    *   [X] Add tabbed interface for sender details, showing profile, statistics, and emoji usage.
 
 ## Next Steps
 
+*   Create a dedicated Timeline component for visualizing message frequency patterns.
+*   Add animations for transitions between different views and states.
 *   Further refine chat parsing for any remaining edge cases if needed.
 *   Implement backend functionality for storing and retrieving analysis results.
 *   Add social sharing functionality to generate shareable images.
 *   Implement premium features and subscription handling.
+*   Add tutorial/onboarding overlays to guide users through the application.
 
 ---
 *This file will be updated as development progresses.*

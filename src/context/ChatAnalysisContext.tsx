@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, useContext, ReactNode } from 'react';
 import { ParsedMessage } from '../lib/parseChat'; // Correct: ParsedMessage comes from parseChat
 // Import the full type definition from the source file
@@ -14,6 +15,10 @@ interface ChatAnalysisContextType {
   setIsLoading: (loading: boolean) => void;
   error: string | null;
   setError: (error: string | null) => void;
+  selectedChartView: 'hourly' | 'daily' | 'weekly';
+  setSelectedChartView: (view: 'hourly' | 'daily' | 'weekly') => void;
+  focusedSender: string | null;
+  setFocusedSender: (sender: string | null) => void;
 }
 
 const ChatAnalysisContext = createContext<ChatAnalysisContextType | undefined>(undefined);
@@ -28,6 +33,8 @@ export const ChatAnalysisProvider: React.FC<ChatAnalysisProviderProps> = ({ chil
   const [analysisResults, setAnalysisResults] = useState<AnalysisResults | null>(null); // Use AnalysisResults from analyzeChat
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedChartView, setSelectedChartView] = useState<'hourly' | 'daily' | 'weekly'>('hourly');
+  const [focusedSender, setFocusedSender] = useState<string | null>(null);
 
   const value = {
     rawChatText,
@@ -40,6 +47,10 @@ export const ChatAnalysisProvider: React.FC<ChatAnalysisProviderProps> = ({ chil
     setIsLoading,
     error,
     setError,
+    selectedChartView,
+    setSelectedChartView,
+    focusedSender,
+    setFocusedSender,
   };
 
   return (

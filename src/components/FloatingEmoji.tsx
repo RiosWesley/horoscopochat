@@ -6,13 +6,15 @@ interface FloatingEmojiProps {
   size?: 'sm' | 'md' | 'lg';
   delay?: number;
   duration?: number;
+  animated?: boolean;
 }
 
 const FloatingEmoji: React.FC<FloatingEmojiProps> = ({ 
   emoji, 
   size = 'md',
   delay = 0,
-  duration = 6
+  duration = 6,
+  animated = true
 }) => {
   const sizeClasses = {
     sm: 'text-2xl',
@@ -27,8 +29,8 @@ const FloatingEmoji: React.FC<FloatingEmojiProps> = ({
 
   return (
     <span 
-      className={`inline-block ${sizeClasses[size]} floating`}
-      style={style}
+      className={`inline-block ${sizeClasses[size]} ${animated ? 'floating' : ''}`}
+      style={animated ? style : undefined}
     >
       {emoji}
     </span>
