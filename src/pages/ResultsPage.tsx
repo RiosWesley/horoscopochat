@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'; // Impo
 import { useNavigate } from 'react-router-dom';
 import html2canvas from 'html2canvas'; // Import html2canvas
 import { getFunctions, httpsCallable } from "firebase/functions"; // Import Firebase functions
-import { firebaseApp } from '@/firebaseConfig'; // Assuming firebase is initialized in firebaseConfig.ts
+import { firebaseApp } from '@/firebaseConfig';
 import { Button } from '@/components/ui/button';
-import { Share2, Clock, Award, Star, Gift, MessageSquareText, Users, Laugh, HelpCircle as QuestionIcon, Text, TrendingUp, TrendingDown, UserCircle, Palette, Calendar, Clock1, Smile, Zap, BarChart, PieChart, LineChart, BrainCircuit, Sparkles } from 'lucide-react'; // Added BrainCircuit, Sparkles
+// Removed BrainCircuit, Sparkles from imports as they are no longer used for AI sections
+import { Share2, Clock, Award, Star, Gift, MessageSquareText, Users, Laugh, HelpCircle as QuestionIcon, Text, TrendingUp, TrendingDown, UserCircle, Palette, Calendar, Clock1, Smile, Zap, BarChart, PieChart, LineChart } from 'lucide-react';
 import { useChatAnalysis } from '@/context/ChatAnalysisContext';
 import GradientBackground from '@/components/GradientBackground';
 import ResultCard, { ShareButton } from '@/components/ResultCard';
@@ -56,11 +57,7 @@ const ResultsPage = () => {
   const [showPremium, setShowPremium] = useState(false); // For the premium upsell screen
   const [isPremiumMock, setIsPremiumMock] = useState(false); // To simulate premium status
   const [timeOfDay, setTimeOfDay] = useState<string>('');
-  // AI Feature State
-  const [aiPrediction, setAiPrediction] = useState<string | null>(null);
-  const [aiStyleAnalysis, setAiStyleAnalysis] = useState<string | null>(null);
-  const [aiLoading, setAiLoading] = useState<boolean>(false);
-  const [aiError, setAiError] = useState<string | null>(null);
+  // Removed AI Feature State and Rate Limiting State
 
   const {
     analysisResults,
@@ -70,7 +67,11 @@ const ResultsPage = () => {
     selectedChartView,
     setSelectedChartView,
     focusedSender,
-    setFocusedSender
+    setFocusedSender,
+    resetAnalysis,
+    // Removed AI state setters from context destructuring
+    // setAiPrediction,
+    // setAiStyleAnalysis
   } = useChatAnalysis();
 
   const [calculatedDates, setCalculatedDates] = useState<{ activeDays: number; timeSpan: string }>({ activeDays: 0, timeSpan: 'Período Indefinido' });
@@ -115,109 +116,7 @@ const ResultsPage = () => {
     else setTimeOfDay('Boa noite');
   }, [analysisResults, parsedMessages, isLoading, error, navigate]);
 
-  // --- AI Feature Logic ---
-  const callAIFeatures = useCallback(async () => {
-    if (!analysisResults || !parsedMessages || !isPremiumMock || aiLoading) {
-      return; // Don't run if not premium, already loading, or no data
-    }
-
-    setAiLoading(true);
-    setAiError(null);
-    setAiPrediction(null); // Reset previous results
-    setAiStyleAnalysis(null);
-
-    try {
-      // --- 1. Generate Creative Text ---
-      const creativePayload = {
-        mostFrequentEmoji: analysisResults.mostFrequentEmoji,
-        favoriteWord: analysisResults.favoriteWord,
-        sentimentMix: analysisResults.keywordCounts.positive > analysisResults.keywordCounts.negative ? 'Positivo' : analysisResults.keywordCounts.negative > analysisResults.keywordCounts.positive ? 'Negativo' : 'Equilibrado',
-        chatSign: generateHeuristics(analysisResults).generatedSign, // Use the generated sign
-      };
-
-      console.log("Calling AI for creative text with payload:", creativePayload);
-      const creativeResult = await callGeminiFunction({ taskType: 'generateCreativeText', payload: creativePayload });
-      const creativeText = (creativeResult.data as any)?.result; // Type assertion
-      if (creativeText) {
-        setAiPrediction(creativeText);
-        console.log("AI Creative Text received:", creativeText);
-      } else {
-         console.warn("AI Creative Text: No result text found in response", creativeResult.data);
-         // Optionally set a default message or leave null
-      }
-
-
-      // --- 2. Analyze Communication Style ---
-      const MAX_CHARS = 600000; // Approx 150k tokens * 4 chars/token
-      let currentChars = 0;
-      const messagesForAnalysis: ParsedMessage[] = [];
-      const senderMap = new Map<string, string>();
-      let participantCounter = 1;
-
-      // Iterate messages from newest to oldest
-      for (let i = parsedMessages.length - 1; i >= 0; i--) {
-        const msg = parsedMessages[i];
-        if (msg.isSystemMessage || !msg.message || !msg.sender) continue; // Skip system messages
-
-        const messageLength = msg.message.length;
-        if (currentChars + messageLength > MAX_CHARS) {
-          break; // Stop if adding this message exceeds the limit
-        }
-
-        messagesForAnalysis.unshift(msg); // Add to the beginning to maintain order
-        currentChars += messageLength;
-
-        // Map sender name if not already mapped
-        if (!senderMap.has(msg.sender)) {
-          senderMap.set(msg.sender, `Participante ${participantCounter++}`);
-        }
-      }
-
-      // Anonymize and format the selected messages
-      const anonymizedText = messagesForAnalysis.map(msg => {
-        const anonymizedSender = msg.sender ? senderMap.get(msg.sender) : 'Sistema';
-        // Basic format: [Timestamp] Sender: Message
-        const timestampStr = msg.timestamp ? msg.timestamp.toLocaleString('pt-BR') : 'Timestamp N/A';
-        return `[${timestampStr}] ${anonymizedSender}: ${msg.message}`;
-      }).join('\n');
-
-      if (anonymizedText.length > 0) {
-          const stylePayload = {
-            anonymizedMessages: anonymizedText,
-            charLimit: MAX_CHARS,
-          };
-          console.log(`Calling AI for style analysis. Char count: ${anonymizedText.length}`);
-          const styleResult = await callGeminiFunction({ taskType: 'analyzeCommunicationStyle', payload: stylePayload });
-          const styleText = (styleResult.data as any)?.result; // Type assertion
-          if (styleText) {
-            setAiStyleAnalysis(styleText);
-            console.log("AI Style Analysis received:", styleText);
-          } else {
-             console.warn("AI Style Analysis: No result text found in response", styleResult.data);
-          }
-      } else {
-         console.log("Skipping style analysis: Not enough messages within character limit.");
-      }
-
-
-    } catch (err) {
-      console.error("Error calling AI Cloud Function:", err);
-      const errorMessage = (err as any)?.message || "Falha ao buscar dados da IA.";
-      setAiError(errorMessage);
-      toast.error(`Erro na análise IA: ${errorMessage}`);
-    } finally {
-      setAiLoading(false);
-    }
-  }, [analysisResults, parsedMessages, isPremiumMock, aiLoading]); // Dependencies
-
-  // Trigger AI calls when premium is active and results are ready
-  useEffect(() => {
-    if (isPremiumMock && analysisResults && parsedMessages && !aiLoading) {
-      callAIFeatures();
-    }
-    // Intentionally not resetting AI results if isPremiumMock becomes false,
-    // so user can see them until they navigate away or reload.
-  }, [isPremiumMock, analysisResults, parsedMessages, callAIFeatures, aiLoading]);
+  // --- Removed AI Feature Logic (callAIFeatures and related useEffect) ---
 
 
   // --- Original Mock Results (Now only used for title) ---
@@ -390,6 +289,15 @@ const ResultsPage = () => {
     }
   };
 
+  // Function to handle "Analyze Another Chat" button click
+  const handleAnalyzeAnother = () => {
+    if (resetAnalysis) {
+      resetAnalysis(); // Clear the current analysis data
+    }
+    navigate('/instructions'); // Navigate back to the instructions page
+    toast.info("Pronto para analisar um novo chat!");
+  };
+
   const handlePremiumClick = () => setShowPremium(true);
   const handleBackToResults = () => setShowPremium(false);
   const handleSubscribe = () => { toast.success('Obrigado por se interessar! Em um app real, isto processaria sua assinatura.'); setTimeout(() => setShowPremium(false), 1500); };
@@ -409,11 +317,10 @@ const ResultsPage = () => {
           <div className="cosmic-card bg-white/40 mb-8">
             <h2 className="text-xl font-bold mb-6 text-center">Torne-se um Mestre Astral das Mensagens 🔮</h2>
             <div className="space-y-5 mb-6">
-              {/* Updated Premium Features */}
-              <div className="flex items-start"><div className="bg-cosmic-pink rounded-full p-2 mr-3"><Sparkles className="h-5 w-5 text-white" /></div><div><h3 className="font-semibold">Previsões & Poemas IA</h3><p className="text-sm opacity-80">Receba textos criativos e únicos gerados por IA sobre seu chat!</p></div></div>
-              <div className="flex items-start"><div className="bg-cosmic-purple rounded-full p-2 mr-3"><BrainCircuit className="h-5 w-5 text-white" /></div><div><h3 className="font-semibold">Análise de Estilo IA</h3><p className="text-sm opacity-80">Descubra a complexidade, diretividade e formalidade da sua comunicação.</p></div></div>
+              {/* Updated Premium Features - Removed AI specific ones */}
               <div className="flex items-start"><div className="bg-cosmic-neonBlue rounded-full p-2 mr-3"><Award className="h-5 w-5 text-white" /></div><div><h3 className="font-semibold">Análises Detalhadas</h3><p className="text-sm opacity-80">Nível de passivo-agressividade, flerte e mais insights.</p></div></div>
               <div className="flex items-start"><div className="bg-cosmic-orange rounded-full p-2 mr-3"><Gift className="h-5 w-5 text-white" /></div><div><h3 className="font-semibold">Experiência Premium</h3><p className="text-sm opacity-80">Sem anúncios e com temas exclusivos.</p></div></div>
+              {/* Add other non-AI premium features here if any */}
             </div>
           </div>
           <div className="cosmic-card bg-white/40 mb-8">
@@ -623,34 +530,10 @@ const ResultsPage = () => {
            {generatedFunFacts.length > 0 ? (<ul className="space-y-3">{generatedFunFacts.map((fact, index) => (<li key={index} className="flex items-start"><span className="mr-2 text-lg">•</span><span>{fact}</span></li>))}</ul>) : (<p className="text-sm opacity-70 text-center py-4">Nenhuma verdade cósmica encontrada por enquanto.</p>)}
         </ResultCard>
 
-        {/* --- AI & Premium Section --- */}
+        {/* --- Premium Section (AI Removed) --- */}
         {isPremiumMock ? (
           <>
-            {/* AI Creative Text */}
-            <ResultCard title="Sua Previsão Cósmica IA" variant="accent">
-              <div className="flex items-start">
-                <Sparkles className="h-6 w-6 mr-3 text-yellow-400 flex-shrink-0 mt-1" />
-                <div>
-                  {aiLoading && <p className="text-sm opacity-70 italic">Gerando previsão com IA...</p>}
-                  {aiError && !aiLoading && <p className="text-sm text-red-400">Erro ao gerar previsão: {aiError}</p>}
-                  {!aiLoading && !aiError && aiPrediction && <p className="whitespace-pre-wrap">{aiPrediction}</p>}
-                  {!aiLoading && !aiError && !aiPrediction && <p className="text-sm opacity-70 italic">Nenhuma previsão gerada.</p>}
-                </div>
-              </div>
-            </ResultCard>
-
-            {/* AI Style Analysis */}
-            <ResultCard title="DNA Comunicacional (IA)" variant="accent">
-               <div className="flex items-start">
-                 <BrainCircuit className="h-6 w-6 mr-3 text-purple-400 flex-shrink-0 mt-1" />
-                 <div>
-                   {aiLoading && <p className="text-sm opacity-70 italic">Analisando estilo com IA...</p>}
-                   {aiError && !aiLoading && <p className="text-sm text-red-400">Erro ao analisar estilo: {aiError}</p>}
-                   {!aiLoading && !aiError && aiStyleAnalysis && <p className="whitespace-pre-wrap">{aiStyleAnalysis}</p>}
-                   {!aiLoading && !aiError && !aiStyleAnalysis && <p className="text-sm opacity-70 italic">Nenhuma análise de estilo gerada.</p>}
-                 </div>
-               </div>
-            </ResultCard>
+            {/* Removed AI Result Cards */}
 
             {/* Original Premium Stats */}
             <ResultCard title="Análises Premium Detalhadas" variant="accent">
@@ -667,11 +550,20 @@ const ResultsPage = () => {
               <p className="text-xs opacity-70 pt-1">Porcentagem de mensagens com indicadores passivo-agressivos ou de flerte.</p>
             </div>
             </ResultCard>
+            {/* Button to navigate to the dedicated premium area */}
+            <div className="mt-4 mb-2 flex justify-center">
+              <Button
+                onClick={() => navigate('/premium')} // Navigate to the premium page route
+                className="bg-gradient-to-r from-cosmic-purple to-cosmic-pink hover:from-cosmic-purple/90 hover:to-cosmic-pink/90 text-white font-semibold py-2 px-6 rounded-lg shadow-md transition-all duration-300 ease-in-out transform hover:scale-105"
+              >
+                Acessar Área Premium Completa ✨
+              </Button>
+            </div>
           </>
         ) : (
-           <ResultCard title="Desbloqueie Análises IA ✨" variant="accent">
+           <ResultCard title="Desbloqueie Análises Detalhadas ✨" variant="accent">
              <div className="text-center py-4">
-               <p className="mb-3">Obtenha previsões criativas, análise de estilo e mais com o Premium!</p>
+               <p className="mb-3">Obtenha insights sobre flerte, passivo-agressividade e mais com o Premium!</p>
                <Button onClick={handlePremiumClick} size="sm" className="bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white">Ver Vantagens Premium</Button>
              </div>
            </ResultCard>
@@ -685,7 +577,7 @@ const ResultsPage = () => {
         </div>
 
         <div className="mt-8 mb-4"><Button onClick={handlePremiumClick} className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-white font-semibold py-4 rounded-xl shadow-lg">Desbloqueie Análises Premium ✨</Button></div>
-        <div className="flex justify-center space-x-4 mb-16"><Button variant="outline" size="sm" className="border-white/30 bg-white/10 text-sm">Analisar Outro Chat</Button><Button variant="outline" size="sm" className="border-white/30 bg-white/10 text-sm">Ver Tutorial</Button></div>
+        <div className="flex justify-center space-x-4 mb-16"><Button onClick={handleAnalyzeAnother} variant="outline" size="sm" className="border-white/30 bg-white/10 text-sm">Analisar Outro Chat</Button><Button variant="outline" size="sm" className="border-white/30 bg-white/10 text-sm">Ver Tutorial</Button></div>
         <ShareButton onClick={handleShare} />
       </div>
 

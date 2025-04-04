@@ -39,6 +39,7 @@ Create a functional web application that analyzes uploaded WhatsApp chat `.txt` 
     *   [X] Update `AnalysisResults` interface with new fields (keywords, avg length, favoriteWord, punctuation, CAPS, expressions).
     *   [X] Add chart view selection state for different time period displays.
     *   [X] Add focused sender state for detailed sender analysis view.
+    *   [X] Add `resetAnalysis` function to clear context state.
 5.  **Page Updates:**
     *   [X] Update `AnalyzingPage` to trigger parsing and analysis, update Context, and navigate.
     *   [X] Update `ResultsPage` to display basic analysis results (total messages, sender counts) from Context, including loading/error states.
@@ -70,6 +71,7 @@ Create a functional web application that analyzes uploaded WhatsApp chat `.txt` 
     *   [X] Implement AI-powered communication style analysis via Cloud Function (`functions/src/index.ts`, `ResultsPage.tsx`).
     *   [X] Add frontend logic for token limiting and message anonymization for AI style analysis (`ResultsPage.tsx`).
     *   [X] Add UI sections in `ResultsPage.tsx` to display AI-generated premium content.
+    *   [X] Implement "Analisar outro chat" button functionality in `ResultsPage.tsx`.
 6.  **UI Components & Visualization:**
     *   [X] Create `ContactBubble` component to display sender names and message counts.
     *   [X] Create `SentimentChart` component using Recharts for displaying sentiment analysis.

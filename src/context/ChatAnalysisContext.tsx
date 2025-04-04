@@ -21,10 +21,11 @@ interface ChatAnalysisContextType {
   setFocusedSender: (sender: string | null) => void;
   isPremium: boolean; // Added isPremium flag
   setIsPremium: (isPremium: boolean) => void; // Added setter for premium status
-  aiPrediction: string | null; // Added AI prediction result
-  setAiPrediction: (prediction: string | null) => void; // Added setter for AI prediction
-  aiStyleAnalysis: string | null; // Added AI style analysis result
-  setAiStyleAnalysis: (analysis: string | null) => void; // Added setter for AI style analysis
+  aiPrediction: string | null;
+  setAiPrediction: (prediction: string | null) => void;
+  aiStyleAnalysis: string | null;
+  setAiStyleAnalysis: (analysis: string | null) => void;
+  resetAnalysis: () => void; // Add the reset function type
 }
 
 const ChatAnalysisContext = createContext<ChatAnalysisContextType | undefined>(undefined);
@@ -42,8 +43,22 @@ export const ChatAnalysisProvider: React.FC<ChatAnalysisProviderProps> = ({ chil
   const [selectedChartView, setSelectedChartView] = useState<'daily' | 'weekly'>('daily'); // Changed default to 'daily'
   const [focusedSender, setFocusedSender] = useState<string | null>(null);
   const [isPremium, setIsPremium] = useState<boolean>(false); // Initialize premium as false
-  const [aiPrediction, setAiPrediction] = useState<string | null>(null); // Initialize AI prediction as null
-  const [aiStyleAnalysis, setAiStyleAnalysis] = useState<string | null>(null); // Initialize AI style analysis as null
+  const [aiPrediction, setAiPrediction] = useState<string | null>(null);
+  const [aiStyleAnalysis, setAiStyleAnalysis] = useState<string | null>(null);
+
+  // Function to reset the analysis state
+  const resetAnalysis = () => {
+    setRawChatText(null);
+    setParsedMessages(null);
+    setAnalysisResults(null);
+    setIsLoading(false); // Ensure loading is reset
+    setError(null);
+    setSelectedChartView('daily'); // Reset view to default
+    setFocusedSender(null);
+    // Keep premium status as is, or reset if desired: setIsPremium(false);
+    setAiPrediction(null); // Reset AI results
+    setAiStyleAnalysis(null);
+  };
 
   const value = {
     rawChatText,
@@ -66,6 +81,7 @@ export const ChatAnalysisProvider: React.FC<ChatAnalysisProviderProps> = ({ chil
     setAiPrediction,
     aiStyleAnalysis,
     setAiStyleAnalysis,
+    resetAnalysis, // Provide the reset function in the context value
   };
 
   return (
