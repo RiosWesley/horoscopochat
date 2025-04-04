@@ -1,3 +1,4 @@
+
 # Horóscopo das Mensagens - Project Progress
 
 ## Goal
@@ -44,12 +45,29 @@ Create a functional web application that analyzes uploaded WhatsApp chat `.txt` 
     *   [X] Add Signo description generation and display.
     *   [X] Add per-sender analysis calculation in `analyzeChat.ts`.
     *   [X] Add per-sender analysis display section in `ResultsPage.tsx`.
+6.  **UI Components & Visualization:**
+    *   [X] Create `ContactBubble` component to display sender names and message counts.
+    *   [X] Create `SentimentChart` component using Recharts for displaying sentiment analysis.
+    *   [X] Create `ActivityHeatmap` component for visualizing message frequency by hour.
+    *   [X] Create `EmojiCloud` component for displaying emoji usage statistics.
+    *   [X] Create `FloatingEmoji` component with optional animation effects.
+    *   [X] Fix `EmojiCloud` component size prop type issue.
+    *   [X] Add welcome header with time-based greeting in `ResultsPage`.
+    *   [X] Add chat info strip with message count and date range.
+    *   [X] Add personality traits visualization section.
+    *   [X] Improve visual styling of result cards and sections.
+    *   [X] Add premium feature teaser and share functionality.
 
 ## Next Steps
 
+*   Implement actual emoji analysis instead of using mock data.
+*   Add more detailed per-user analysis.
 *   Consider adding more analysis types (e.g., response times if possible, specific phrase tracking).
 *   Further refine chat parsing for any remaining edge cases if needed.
-*   Further refine heuristics in `ResultsPage.tsx`.
+*   Implement backend functionality for storing and retrieving analysis results.
+*   Add social sharing functionality to generate shareable images.
+*   Implement premium features and subscription handling.
 
 ---
 *This file will be updated as development progresses.*
+

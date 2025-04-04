@@ -29,7 +29,7 @@ const EmojiCloud: React.FC<EmojiCloudProps> = ({
       {topEmojis.map((emojiData, index) => {
         // Scale size based on count (between 1x and 2.5x)
         const scale = 1 + ((emojiData.count / maxCount) * 1.5);
-        const size = scale > 2 ? 'xl' : scale > 1.5 ? 'lg' : scale > 1.2 ? 'md' : 'sm';
+        const size = scale > 2 ? 'lg' : scale > 1.5 ? 'md' : 'sm';
         
         return (
           <div key={index} className="relative flex flex-col items-center">
