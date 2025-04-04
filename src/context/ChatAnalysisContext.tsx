@@ -19,6 +19,12 @@ interface ChatAnalysisContextType {
   setSelectedChartView: (view: 'daily' | 'weekly') => void; // Removed 'hourly'
   focusedSender: string | null;
   setFocusedSender: (sender: string | null) => void;
+  isPremium: boolean; // Added isPremium flag
+  setIsPremium: (isPremium: boolean) => void; // Added setter for premium status
+  aiPrediction: string | null; // Added AI prediction result
+  setAiPrediction: (prediction: string | null) => void; // Added setter for AI prediction
+  aiStyleAnalysis: string | null; // Added AI style analysis result
+  setAiStyleAnalysis: (analysis: string | null) => void; // Added setter for AI style analysis
 }
 
 const ChatAnalysisContext = createContext<ChatAnalysisContextType | undefined>(undefined);
@@ -35,6 +41,9 @@ export const ChatAnalysisProvider: React.FC<ChatAnalysisProviderProps> = ({ chil
   const [error, setError] = useState<string | null>(null);
   const [selectedChartView, setSelectedChartView] = useState<'daily' | 'weekly'>('daily'); // Changed default to 'daily'
   const [focusedSender, setFocusedSender] = useState<string | null>(null);
+  const [isPremium, setIsPremium] = useState<boolean>(false); // Initialize premium as false
+  const [aiPrediction, setAiPrediction] = useState<string | null>(null); // Initialize AI prediction as null
+  const [aiStyleAnalysis, setAiStyleAnalysis] = useState<string | null>(null); // Initialize AI style analysis as null
 
   const value = {
     rawChatText,
@@ -51,6 +60,12 @@ export const ChatAnalysisProvider: React.FC<ChatAnalysisProviderProps> = ({ chil
     setSelectedChartView,
     focusedSender,
     setFocusedSender,
+    isPremium,
+    setIsPremium,
+    aiPrediction,
+    setAiPrediction,
+    aiStyleAnalysis,
+    setAiStyleAnalysis,
   };
 
   return (

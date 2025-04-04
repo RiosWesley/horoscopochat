@@ -7,13 +7,15 @@ interface ContactBubbleProps {
   messageCount: number;
   size?: 'sm' | 'md' | 'lg';
   color?: string;
+  highlight?: boolean; // Added highlight prop
 }
 
 const ContactBubble: React.FC<ContactBubbleProps> = ({ 
   name, 
   messageCount, 
   size = 'md',
-  color 
+  color,
+  highlight = false // Default to false 
 }) => {
   const initials = name
     .split(' ')
@@ -55,7 +57,8 @@ const ContactBubble: React.FC<ContactBubbleProps> = ({
       <div className={cn(
         "rounded-full flex items-center justify-center font-medium",
         sizeClasses[size],
-        colorClass
+        colorClass,
+        highlight && "ring-2 ring-yellow-300 ring-offset-1" // Apply highlight style if enabled
       )}>
         {initials}
       </div>
