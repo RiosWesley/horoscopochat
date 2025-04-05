@@ -4,7 +4,8 @@ import html2canvas from 'html2canvas';
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { firebaseApp } from '@/firebaseConfig';
 import { Button } from '@/components/ui/button';
-import { Share2, Clock, Award, Star, Gift, MessageSquareText, Users, Laugh, HelpCircle as QuestionIcon, Text, TrendingUp, TrendingDown, UserCircle, Palette, Calendar, Clock1, Smile, Zap, BarChart, PieChart, LineChart, Link as LinkIcon, ClipboardCopy, Loader2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'; // Import Dialog components
+import { Share2, Clock, Award, Star, Gift, MessageSquareText, Users, Laugh, HelpCircle as QuestionIcon, Text, TrendingUp, TrendingDown, UserCircle, Palette, Calendar, Clock1, Smile, Zap, BarChart, PieChart, LineChart, Link as LinkIcon, ClipboardCopy, Loader2, X, BrainCircuit, Sparkles } from 'lucide-react'; // Added X, BrainCircuit, Sparkles icons
 import { useChatAnalysis } from '@/context/ChatAnalysisContext';
 import GradientBackground from '@/components/GradientBackground';
 import ResultCard, { ShareButton } from '@/components/ResultCard';
@@ -819,13 +820,13 @@ const ResultsPage = () => {
         )}
 
         {/* Bottom Buttons */}
-        <div className="mt-8 mb-4">
-           {/* Premium Upsell Button (Hide if shared link or already premium) */}
-           {!analysisId && !isPremiumMock && (
-             <Button onClick={handlePremiumClick} className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-white font-semibold py-4 rounded-xl shadow-lg">Desbloqueie Análises Premium ✨</Button>
-           )}
-        </div>
-        <div className="flex justify-center space-x-4 mb-16">
+         <div className="mt-8 mb-4">
+            {/* Premium Upsell Button (Hide if shared link or already premium) */}
+            {!analysisId && !isPremiumMock && (
+              <Button onClick={handlePremiumClick} className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-white font-semibold py-4 rounded-xl shadow-lg">Desbloqueie Análises Premium ✨</Button>
+            )}
+         </div>
+         <div className="flex justify-center space-x-4 mb-16">
            {/* Analyze Another Button (Always show?) */}
            <Button onClick={handleAnalyzeAnother} variant="outline" size="sm" className="border-white/30 bg-white/10 text-sm">Analisar Outro Chat</Button>
            {/* Tutorial Button (Always show?) */}
@@ -855,6 +856,40 @@ const ResultsPage = () => {
           mostFrequentEmoji={analysisResults.mostFrequentEmoji}
         />
       </div>
+
+      {/* Premium Upsell Modal */}
+      <Dialog open={showPremium} onOpenChange={setShowPremium}>
+        <DialogContent className="sm:max-w-[425px] bg-gradient-to-br from-purple-600 to-indigo-700 text-white border-purple-400">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-center text-yellow-300">✨ Desbloqueie o Poder Premium! ✨</DialogTitle>
+            <DialogDescription className="text-center text-purple-200 pt-2">
+              Leve sua análise para o próximo nível com recursos exclusivos.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-3 text-sm">
+            <p><Star className="inline w-4 h-4 mr-1 text-yellow-400" /> Análise de Flerte e Passivo-Agressividade.</p>
+            <p><BrainCircuit className="inline w-4 h-4 mr-1 text-green-400" /> Insights gerados por IA (Previsão, Poema, Estilo).</p>
+            <p><Award className="inline w-4 h-4 mr-1 text-blue-400" /> Métricas detalhadas por participante.</p>
+            <p><Sparkles className="inline w-4 h-4 mr-1 text-pink-400" /> E muito mais em breve!</p>
+          </div>
+          <Separator className="bg-white/20 my-4" />
+          <div className="text-center">
+             <p className="font-semibold mb-2">Plano Premium:</p>
+             <p className="text-lg font-bold">R$ 5,00 <span className="text-xs font-normal opacity-80">/ análise única</span></p>
+             {/* <p className="text-lg font-bold mt-1">R$ 29,90 <span className="text-xs font-normal opacity-80">/ mês (ilimitado)</span></p> */}
+          </div>
+          <DialogFooter className="mt-6 sm:justify-center">
+            <Button onClick={handleSubscribe} className="w-full sm:w-auto bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white font-bold shadow-lg">
+              Desbloquear Análise (R$ 5,00)
+            </Button>
+          </DialogFooter>
+           <Button variant="ghost" size="icon" className="absolute top-4 right-4 text-purple-200 hover:text-white" onClick={() => setShowPremium(false)}>
+             <X className="h-4 w-4" />
+             <span className="sr-only">Fechar</span>
+           </Button>
+        </DialogContent>
+      </Dialog>
+
     </GradientBackground>
   );
 };
