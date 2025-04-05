@@ -23,6 +23,8 @@ interface ChatAnalysisContextType {
   setIsPremium: (isPremium: boolean) => void; // Added setter for premium status
   aiPrediction: string | null;
   setAiPrediction: (prediction: string | null) => void;
+  aiPoem: string | null; // Add state for AI Poem
+  setAiPoem: (poem: string | null) => void; // Add setter for AI Poem
   aiStyleAnalysis: string | null;
   setAiStyleAnalysis: (analysis: string | null) => void;
   resetAnalysis: () => void; // Add the reset function type
@@ -48,6 +50,7 @@ export const ChatAnalysisProvider: React.FC<ChatAnalysisProviderProps> = ({ chil
   const [focusedSender, setFocusedSender] = useState<string | null>(null);
   const [isPremium, setIsPremium] = useState<boolean>(false); // Initialize premium as false
   const [aiPrediction, setAiPrediction] = useState<string | null>(null);
+  const [aiPoem, setAiPoem] = useState<string | null>(null); // Initialize AI Poem state
   const [aiStyleAnalysis, setAiStyleAnalysis] = useState<string | null>(null);
   const [lastAiCallTime, setLastAiCallTime] = useState<number>(0);
   const [aiCallCount, setAiCallCount] = useState<number>(0);
@@ -63,6 +66,7 @@ export const ChatAnalysisProvider: React.FC<ChatAnalysisProviderProps> = ({ chil
     setFocusedSender(null);
     // Keep premium status as is, or reset if desired: setIsPremium(false);
     setAiPrediction(null); // Reset AI results
+    setAiPoem(null); // Reset AI Poem
     setAiStyleAnalysis(null);
     setLastAiCallTime(0);
     setAiCallCount(0);
@@ -87,6 +91,8 @@ export const ChatAnalysisProvider: React.FC<ChatAnalysisProviderProps> = ({ chil
     setIsPremium,
     aiPrediction,
     setAiPrediction,
+    aiPoem, // Provide AI Poem state
+    setAiPoem, // Provide AI Poem setter
     aiStyleAnalysis,
     setAiStyleAnalysis,
     resetAnalysis, // Provide the reset function in the context value

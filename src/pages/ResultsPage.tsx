@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'; // Import useRef, useCallback
 import { useNavigate } from 'react-router-dom';
 import html2canvas from 'html2canvas'; // Import html2canvas
-import { getFunctions, httpsCallable } from "firebase/functions"; // Import Firebase functions
-import { firebaseApp } from '@/firebaseConfig';
+// Removed Firebase functions imports as AI calls are now in PremiumPage
+// import { getFunctions, httpsCallable } from "firebase/functions";
+// import { firebaseApp } from '@/firebaseConfig';
 import { Button } from '@/components/ui/button';
 // Removed BrainCircuit, Sparkles from imports as they are no longer used for AI sections
 import { Share2, Clock, Award, Star, Gift, MessageSquareText, Users, Laugh, HelpCircle as QuestionIcon, Text, TrendingUp, TrendingDown, UserCircle, Palette, Calendar, Clock1, Smile, Zap, BarChart, PieChart, LineChart } from 'lucide-react';
@@ -24,9 +25,9 @@ import TimelineChart from '@/components/TimelineChart'; // Import the new chart 
 import type { AnalysisResults, SenderStats } from '../lib/analyzeChat';
 import type { ParsedMessage } from '../lib/parseChat';
 
-// Initialize Firebase Functions
-const functions = getFunctions(firebaseApp);
-const callGeminiFunction = httpsCallable(functions, 'callGemini');
+// Removed Firebase Functions initialization as AI calls are now in PremiumPage
+// const functions = getFunctions(firebaseApp);
+// const callGeminiFunction = httpsCallable(functions, 'callGemini');
 
 // --- Helper Functions ---
 const findTopItem = (record: Record<string, number>): string | null => {

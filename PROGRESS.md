@@ -95,7 +95,7 @@ Create a functional web application that analyzes uploaded WhatsApp chat `.txt` 
 
 *   Add animations for transitions between different views and states.
 *   Further refine chat parsing for any remaining edge cases if needed.
-*   Deploy Firebase Cloud Function (`callGemini`).
+*   [X] Deploy Firebase Cloud Function (`callGemini`). *(Skipped - No changes detected)*
 *   Implement *actual* premium features and subscription handling (currently mocked).
 *   Securely manage API keys using environment variables/secrets management for production.
 *   Add explicit user consent flow for sending data to AI APIs.

@@ -40,22 +40,29 @@ interface RequestData {
 export const callGemini = functions.https.onCall(async (data: unknown, context) => {
   functions.logger.info("callGemini function started.", { structuredData: true }); // Added start log
 
-  // Re-check API key just in case config wasn't deployed/set correctly
-  const apiKey = functions.config().gemini?.key;
+  // Access the API key from environment variables (recommended for v2)
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-      functions.logger.error("Gemini API Key not found in function runtime configuration.");
-      throw new functions.https.HttpsError("internal", "API Key configuration error.");
+      functions.logger.error("Gemini API Key not found in environment variables (GEMINI_API_KEY).");
+      // Provide a more specific error message for the client
+      throw new functions.https.HttpsError("internal", "Configuration error: Missing API Key on the server.");
   }
   // Initialize the Google Generative AI client *inside* the handler
   const genAI = new GoogleGenerativeAI(apiKey);
 
-  // Type assertion and validation
-  const requestData = data as RequestData; // Assert the type
-  if (!requestData || !requestData.taskType || !requestData.payload) {
-    functions.logger.error("Invalid request data structure:", { data }); // Log the invalid data
+  // --- Data Validation ---
+  // The client SDK wraps the data in a 'data' field. The V1 handler might
+  // or might not unwrap it automatically in a V2 environment. Check both.
+  const actualPayload = (data as any)?.data || data;
+  functions.logger.info("Received data/payload:", { originalData: data, actualPayload: actualPayload }); // Log both for debugging
+
+  // Type assertion and validation on the actual data payload
+  const requestData = actualPayload as RequestData; // Assert the type on the potentially unwrapped data
+  if (!requestData || typeof requestData !== 'object' || !requestData.taskType || !requestData.payload) {
+    functions.logger.error("Invalid request data structure after potential unwrap. Received:", { originalData: data, actualPayload: actualPayload }); // Log the invalid data
     throw new functions.https.HttpsError(
       "invalid-argument",
-      "The function must be called with 'taskType' and 'payload' arguments."
+      "Invalid request structure. Expected { data: { taskType: '...', payload: {...} } }." // More specific error
     );
   }
 
@@ -67,7 +74,7 @@ export const callGemini = functions.https.onCall(async (data: unknown, context) 
 
   try {
     functions.logger.info("Initializing Gemini model..."); // Log model init
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", safetySettings });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-8b", safetySettings });
     functions.logger.info("Gemini model initialized."); // Log success
 
     switch (taskType) {
