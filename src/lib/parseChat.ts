@@ -99,23 +99,21 @@ export const parseChat = (rawText: string): ParsedMessage[] => {
       const trimmedMessageContent = messageContent.trim();
       const lowerMessageContent = trimmedMessageContent.toLowerCase();
 
-      // --- Refined System Message Check ---
-      // 1. Initial check: Is there a sender? If not, it's likely system.
-      // 'isSystem' was already declared above, before this block.
-      // let isSystem = !sender; // REMOVED duplicate declaration
+      // --- System Message Check (Corrected Logic v2) ---
+      // Priority 1: Check if the message *contains* the edited message marker
+      const isEditedMessage = lowerMessageContent.includes('<mensagem editada>') || lowerMessageContent.includes('<message edited>');
 
-      // 2. Explicit check for "edited message" variants. This takes priority.
-      const isEditedMessage = lowerMessageContent === 'mensagem editada' || lowerMessageContent === '<mensagem editada>' || lowerMessageContent === 'message edited' || lowerMessageContent === '<message edited>';
-      
-      if (isEditedMessage) {
-          isSystem = true; // Mark as system if it's an edited message notification
-      } else if (isSystem) { 
-          // 3. If it was initially marked as system (no sender) AND it's NOT an edited message, 
-          //    then check against the list of known system message keywords.
-          isSystem = systemMessageKeywords.some(keyword => lowerMessageContent.includes(keyword));
-      }
-      // If it had a sender AND wasn't an edited message, isSystem remains false.
-      // --- End Refined System Message Check ---
+      // Priority 2: Check for keywords indicating system actions (like adding/removing users, changing group info)
+      // This check should happen regardless of whether a sender was initially captured.
+      const containsSystemKeyword = systemMessageKeywords.some(keyword => lowerMessageContent.includes(keyword));
+
+      // Priority 3: Fallback - if no sender was captured by the regex initially, it's likely a system message
+      const noSenderCaptured = !sender;
+
+      // Determine final system status
+      // REMOVED DEBUG LOG
+      isSystem = isEditedMessage || containsSystemKeyword || noSenderCaptured;
+      // --- End System Message Check ---
 
 
       currentMessage = {

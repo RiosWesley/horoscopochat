@@ -212,6 +212,7 @@ export const analyzeChat = (messages: ParsedMessage[]): AnalysisResults => {
     // Skip system messages or messages without content/sender/timestamp
     if (msg.isSystemMessage || !msg.message || !msg.sender || !msg.timestamp) return;
 
+    // Continue processing non-system messages
     results.totalMessages++;
 
     let senderStats: SenderStats | undefined;
