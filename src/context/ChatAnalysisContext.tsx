@@ -26,6 +26,10 @@ interface ChatAnalysisContextType {
   aiStyleAnalysis: string | null;
   setAiStyleAnalysis: (analysis: string | null) => void;
   resetAnalysis: () => void; // Add the reset function type
+  lastAiCallTime: number;
+  setLastAiCallTime: (time: number) => void;
+  aiCallCount: number;
+  setAiCallCount: (count: number) => void;
 }
 
 const ChatAnalysisContext = createContext<ChatAnalysisContextType | undefined>(undefined);
@@ -45,6 +49,8 @@ export const ChatAnalysisProvider: React.FC<ChatAnalysisProviderProps> = ({ chil
   const [isPremium, setIsPremium] = useState<boolean>(false); // Initialize premium as false
   const [aiPrediction, setAiPrediction] = useState<string | null>(null);
   const [aiStyleAnalysis, setAiStyleAnalysis] = useState<string | null>(null);
+  const [lastAiCallTime, setLastAiCallTime] = useState<number>(0);
+  const [aiCallCount, setAiCallCount] = useState<number>(0);
 
   // Function to reset the analysis state
   const resetAnalysis = () => {
@@ -58,6 +64,8 @@ export const ChatAnalysisProvider: React.FC<ChatAnalysisProviderProps> = ({ chil
     // Keep premium status as is, or reset if desired: setIsPremium(false);
     setAiPrediction(null); // Reset AI results
     setAiStyleAnalysis(null);
+    setLastAiCallTime(0);
+    setAiCallCount(0);
   };
 
   const value = {
@@ -82,6 +90,10 @@ export const ChatAnalysisProvider: React.FC<ChatAnalysisProviderProps> = ({ chil
     aiStyleAnalysis,
     setAiStyleAnalysis,
     resetAnalysis, // Provide the reset function in the context value
+    lastAiCallTime,
+    setLastAiCallTime,
+    aiCallCount,
+    setAiCallCount,
   };
 
   return (
