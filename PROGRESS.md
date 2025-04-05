@@ -76,6 +76,7 @@ Create a functional web application that analyzes uploaded WhatsApp chat `.txt` 
     *   [X] Create dedicated Premium Page (`/premium`).
     *   [X] Implement AI analysis calls and display on Premium Page.
     *   [X] Implement Passive-Aggressive and Flirtation analysis display (including random compatibility) on Premium Page.
+    *   [X] Implement Save/Share functionality (`/results/:analysisId`, Firestore save/load via Cloud Functions, including premium status display on shared links).
 6.  **UI Components & Visualization:**
     *   [X] Create `ContactBubble` component to display sender names and message counts.
     *   [X] Create `SentimentChart` component using Recharts for displaying sentiment analysis.

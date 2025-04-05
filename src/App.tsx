@@ -27,7 +27,8 @@ const App = () => (
             <Route path="/welcome" element={<WelcomePage />} />
             <Route path="/instructions" element={<InstructionsPage />} />
             <Route path="/analyzing" element={<AnalyzingPage />} />
-            <Route path="/results" element={<ResultsPage />} />
+            {/* Updated route to accept optional analysisId */}
+            <Route path="/results/:analysisId?" element={<ResultsPage />} />
             <Route path="/premium" element={<PremiumPage />} /> {/* Add premium route */}
             <Route path="*" element={<NotFound />} />
           </Routes>

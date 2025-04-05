@@ -184,7 +184,7 @@ export const callGemini = functions.https.onCall(async (data: unknown, context) 
 // --- Function to Save Analysis Results ---
 // Define the structure of the data we expect to receive and save
 // IMPORTANT: This MUST NOT include raw/parsed messages, only aggregated results.
-interface AnalysisResultsToSave {
+export interface AnalysisResultsToSave { // Added export
   totalMessages: number;
   messagesPerSender: Record<string, number>;
   emojiCounts: Record<string, number>;
@@ -221,8 +221,8 @@ interface AnalysisResultsToSave {
   aiPrediction: string | null;
   aiPoem: string | null;
   aiStyleAnalysis: string | null;
-  // Heuristics
-  generatedSign: string | null;
+  // Heuristics - generatedSign is calculated client-side, not saved
+  isPremiumAnalysis: boolean; // Flag indicating if the original analysis was premium
   // Add any other relevant aggregated/generated fields
   createdAt: admin.firestore.FieldValue; // Timestamp for saving
 }
@@ -261,7 +261,8 @@ export const saveAnalysisResults = functions.https.onCall(async (data: unknown, 
   if (typeof receivedData.aiPrediction === 'string' || receivedData.aiPrediction === null) dataToSave.aiPrediction = receivedData.aiPrediction;
   if (typeof receivedData.aiPoem === 'string' || receivedData.aiPoem === null) dataToSave.aiPoem = receivedData.aiPoem;
   if (typeof receivedData.aiStyleAnalysis === 'string' || receivedData.aiStyleAnalysis === null) dataToSave.aiStyleAnalysis = receivedData.aiStyleAnalysis;
-  if (typeof receivedData.generatedSign === 'string' || receivedData.generatedSign === null) dataToSave.generatedSign = receivedData.generatedSign;
+  // Do not save generatedSign: if (typeof receivedData.generatedSign === 'string' || receivedData.generatedSign === null) dataToSave.generatedSign = receivedData.generatedSign;
+  if (typeof receivedData.isPremiumAnalysis === 'boolean') dataToSave.isPremiumAnalysis = receivedData.isPremiumAnalysis; // Save the premium flag
   // --- End mapping ---
 
   // Add server timestamp
