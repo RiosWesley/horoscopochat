@@ -70,6 +70,7 @@ const ResultsPage = () => {
     focusedSender,
     setFocusedSender,
     resetAnalysis,
+    setGeneratedSign, // Add setter for the generated sign
     // Removed AI state setters from context destructuring
     // setAiPrediction,
     // setAiStyleAnalysis
@@ -222,6 +223,14 @@ const ResultsPage = () => {
   };
 
   const { generatedSign, generatedSignoDescription, generatedFunFacts } = generateHeuristics(analysisResults);
+
+  // Save the generated sign to context after calculating it
+  useEffect(() => {
+    if (generatedSign && setGeneratedSign) {
+      setGeneratedSign(generatedSign);
+    }
+    // Dependency array ensures this runs only when generatedSign changes
+  }, [generatedSign, setGeneratedSign]);
 
   const emojiCloudData = Object.entries(analysisResults.emojiCounts).map(([emoji, count]) => ({ emoji, count })).sort((a, b) => b.count - a.count);
 

@@ -23,7 +23,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.callGemini = void 0;
+exports.getAnalysisResults = exports.saveAnalysisResults = exports.callGemini = void 0;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const generative_ai_1 = require("@google/generative-ai");
@@ -84,23 +84,39 @@ exports.callGemini = functions.https.onCall(async (data, context) => {
         functions.logger.info("Gemini model initialized."); // Log success
         switch (taskType) {
             case "generateCreativeText":
-                functions.logger.info("Generating creative text prompt...", { payload }); // Log payload
-                // Payload should contain local analysis results
-                const { mostFrequentEmoji, favoriteWord, sentimentMix, chatSign } = payload;
-                prompt = `
-          Com base nos seguintes dados de análise de um chat do WhatsApp:
+                // Payload now contains creativeType ('prediction' or 'poem')
+                const { mostFrequentEmoji, favoriteWord, sentimentMix, chatSign, creativeType } = payload;
+                functions.logger.info(`Generating creative text prompt for type: ${creativeType}`, { payload }); // Log payload including creativeType
+                // Base context string
+                const baseContext = `
+          Dados de análise de um chat do WhatsApp:
           - Emoji mais usado: ${mostFrequentEmoji || "Nenhum"}
           - Palavra favorita (ignorando comuns): ${favoriteWord || "Nenhuma"}
           - Mix de sentimento (positivo/negativo): ${sentimentMix || "Equilibrado"}
-          - "Signo" do chat (baseado na hora mais ativa): ${chatSign || "Explorador do ZapVerso"}
+          - "Signo" do chat (baseado na hora mais ativa): ${chatSign || "Explorador do ZapVerso"}`;
+                // Generate specific prompt based on creativeType
+                if (creativeType === 'prediction') {
+                    prompt = `
+            ${baseContext}
 
-          Gere um dos seguintes, de forma aleatória (escolha um):
-          1. Uma previsão curta (2-3 frases), divertida e otimista no estilo 'horóscopo maluco' para este chat.
-          2. Um pequeno poema ou haiku (3-5 linhas) sobre a vibe deste chat.
+            Com base nesses dados, especialmente o "Signo" (${chatSign || "Explorador"}) e o sentimento (${sentimentMix || "Equilibrado"}), crie uma previsão curta (2-3 frases), divertida e otimista no estilo 'horóscopo maluco' para este chat.
+            Reflita o sentimento e o signo na sua previsão. Use português brasileiro.
+            Não inclua introduções como "Aqui está sua previsão:", apenas o texto gerado.
+          `;
+                }
+                else if (creativeType === 'poem') {
+                    prompt = `
+            ${baseContext}
 
-          Seja criativo, use um tom leve e evite ser genérico. Use português brasileiro.
-          Não inclua introduções como "Aqui está sua previsão:" ou "Aqui está seu poema:", apenas o texto gerado.
-        `;
+            Inspirado por esses dados, especialmente o sentimento (${sentimentMix || "Equilibrado"}) e o emoji (${mostFrequentEmoji || "Nenhum"}), escreva um pequeno poema ou haiku (3-5 linhas) sobre a vibe deste chat.
+            Tente capturar o sentimento predominante. Use português brasileiro.
+            Não inclua introduções como "Aqui está seu poema:", apenas o texto gerado.
+          `;
+                }
+                else {
+                    functions.logger.error("Unknown creativeType received within generateCreativeText task:", { creativeType });
+                    throw new functions.https.HttpsError("invalid-argument", "Invalid 'creativeType' provided for generateCreativeText.");
+                }
                 break;
             case "analyzeCommunicationStyle":
                 functions.logger.info("Generating style analysis prompt...", { payloadKeys: Object.keys(payload) }); // Log payload keys only
@@ -127,6 +143,7 @@ exports.callGemini = functions.https.onCall(async (data, context) => {
         }
         // Call the Gemini API
         functions.logger.info(`Calling Gemini API for task: ${taskType}`); // Log API call start
+        functions.logger.info("Final prompt for Gemini:", { prompt }); // Log the final prompt
         const result = await model.generateContent(prompt);
         functions.logger.info("Gemini API call completed."); // Log API call end
         const response = result.response;
@@ -151,6 +168,109 @@ exports.callGemini = functions.https.onCall(async (data, context) => {
         const errorMessage = error instanceof Error ? error.message : "Erro desconhecido ao chamar a API de IA.";
         // Throwing an HttpsError allows the client to catch it gracefully
         throw new functions.https.HttpsError("internal", `Falha ao processar a solicitação de IA: ${errorMessage}`);
+    }
+});
+exports.saveAnalysisResults = functions.https.onCall(async (data, context) => {
+    functions.logger.info("saveAnalysisResults function started.");
+    // Validate input data structure (ensure it matches AnalysisResultsToSave)
+    // It's crucial to filter here on the server-side to prevent saving sensitive data
+    const receivedData = data?.data || data; // Handle potential client SDK wrapping
+    functions.logger.info("Received data for saving:", { receivedData });
+    // **Perform strict validation and filtering here**
+    // Only pick the fields defined in AnalysisResultsToSave from receivedData
+    // Example (needs to be more robust based on actual AnalysisResults structure):
+    if (!receivedData || typeof receivedData !== 'object') {
+        throw new functions.https.HttpsError("invalid-argument", "Invalid data format received.");
+    }
+    const dataToSave = {}; // Use Partial initially
+    // --- Manually map and validate allowed fields ---
+    if (typeof receivedData.totalMessages === 'number')
+        dataToSave.totalMessages = receivedData.totalMessages;
+    if (typeof receivedData.messagesPerSender === 'object')
+        dataToSave.messagesPerSender = receivedData.messagesPerSender; // Consider if sender names are sensitive
+    if (typeof receivedData.emojiCounts === 'object')
+        dataToSave.emojiCounts = receivedData.emojiCounts;
+    if (typeof receivedData.mostFrequentEmoji === 'string' || receivedData.mostFrequentEmoji === null)
+        dataToSave.mostFrequentEmoji = receivedData.mostFrequentEmoji;
+    if (typeof receivedData.keywordCounts === 'object')
+        dataToSave.keywordCounts = receivedData.keywordCounts;
+    if (typeof receivedData.averageMessageLength === 'number')
+        dataToSave.averageMessageLength = receivedData.averageMessageLength;
+    if (typeof receivedData.favoriteWord === 'string' || receivedData.favoriteWord === null)
+        dataToSave.favoriteWord = receivedData.favoriteWord;
+    if (typeof receivedData.punctuationEmphasisCount === 'number')
+        dataToSave.punctuationEmphasisCount = receivedData.punctuationEmphasisCount;
+    if (typeof receivedData.capsWordCount === 'number')
+        dataToSave.capsWordCount = receivedData.capsWordCount;
+    if (Array.isArray(receivedData.topExpressions))
+        dataToSave.topExpressions = receivedData.topExpressions;
+    if (typeof receivedData.statsPerSender === 'object')
+        dataToSave.statsPerSender = receivedData.statsPerSender; // Again, consider sender names
+    if (typeof receivedData.passiveAggressivePercentage === 'number' || receivedData.passiveAggressivePercentage === null)
+        dataToSave.passiveAggressivePercentage = receivedData.passiveAggressivePercentage;
+    if (typeof receivedData.flirtationPercentage === 'number' || receivedData.flirtationPercentage === null)
+        dataToSave.flirtationPercentage = receivedData.flirtationPercentage;
+    if (typeof receivedData.aiPrediction === 'string' || receivedData.aiPrediction === null)
+        dataToSave.aiPrediction = receivedData.aiPrediction;
+    if (typeof receivedData.aiPoem === 'string' || receivedData.aiPoem === null)
+        dataToSave.aiPoem = receivedData.aiPoem;
+    if (typeof receivedData.aiStyleAnalysis === 'string' || receivedData.aiStyleAnalysis === null)
+        dataToSave.aiStyleAnalysis = receivedData.aiStyleAnalysis;
+    if (typeof receivedData.generatedSign === 'string' || receivedData.generatedSign === null)
+        dataToSave.generatedSign = receivedData.generatedSign;
+    // --- End mapping ---
+    // Add server timestamp
+    dataToSave.createdAt = admin.firestore.FieldValue.serverTimestamp();
+    // Check if we actually have something to save after filtering
+    if (Object.keys(dataToSave).length < 2) { // < 2 because createdAt is always added
+        functions.logger.error("No valid data fields found after filtering.", { receivedData });
+        throw new functions.https.HttpsError("invalid-argument", "No valid analysis data provided to save.");
+    }
+    try {
+        const db = admin.firestore();
+        const docRef = await db.collection("sharedAnalyses").add(dataToSave);
+        functions.logger.info(`Analysis saved successfully with ID: ${docRef.id}`);
+        return { success: true, analysisId: docRef.id };
+    }
+    catch (error) {
+        functions.logger.error("Error saving analysis to Firestore:", error);
+        throw new functions.https.HttpsError("internal", "Failed to save analysis results.");
+    }
+});
+exports.getAnalysisResults = functions.https.onCall(async (data, context) => {
+    functions.logger.info("getAnalysisResults function started.");
+    const requestData = data?.data || data; // Handle potential client SDK wrapping
+    const { analysisId } = requestData;
+    if (!analysisId || typeof analysisId !== 'string') {
+        functions.logger.error("Invalid or missing analysisId.", { requestData });
+        throw new functions.https.HttpsError("invalid-argument", "An 'analysisId' must be provided.");
+    }
+    functions.logger.info(`Attempting to fetch analysis with ID: ${analysisId}`);
+    try {
+        const db = admin.firestore();
+        const docRef = db.collection("sharedAnalyses").doc(analysisId);
+        const docSnap = await docRef.get();
+        if (!docSnap.exists) {
+            functions.logger.warn(`Analysis document not found for ID: ${analysisId}`);
+            throw new functions.https.HttpsError("not-found", "Analysis not found.");
+        }
+        else {
+            const savedData = docSnap.data();
+            functions.logger.info(`Analysis data fetched successfully for ID: ${analysisId}`);
+            // Convert Firestore Timestamp back to Date or ISO string if needed by client
+            if (savedData?.createdAt?.toDate) {
+                savedData.createdAt = savedData.createdAt.toDate().toISOString();
+            }
+            return { success: true, results: savedData };
+        }
+    }
+    catch (error) {
+        // Catch specific 'not-found' error to return it, otherwise log and return internal error
+        if (error instanceof functions.https.HttpsError && error.code === "not-found") {
+            throw error;
+        }
+        functions.logger.error(`Error fetching analysis ${analysisId} from Firestore:`, error);
+        throw new functions.https.HttpsError("internal", "Failed to retrieve analysis results.");
     }
 });
 //# sourceMappingURL=index.js.map

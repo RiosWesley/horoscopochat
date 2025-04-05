@@ -32,6 +32,8 @@ interface ChatAnalysisContextType {
   setLastAiCallTime: (time: number) => void;
   aiCallCount: number;
   setAiCallCount: (count: number) => void;
+  generatedSign: string | null; // Add state for the generated sign
+  setGeneratedSign: (sign: string | null) => void; // Add setter for the sign
 }
 
 const ChatAnalysisContext = createContext<ChatAnalysisContextType | undefined>(undefined);
@@ -54,6 +56,7 @@ export const ChatAnalysisProvider: React.FC<ChatAnalysisProviderProps> = ({ chil
   const [aiStyleAnalysis, setAiStyleAnalysis] = useState<string | null>(null);
   const [lastAiCallTime, setLastAiCallTime] = useState<number>(0);
   const [aiCallCount, setAiCallCount] = useState<number>(0);
+  const [generatedSign, setGeneratedSign] = useState<string | null>(null); // Initialize generated sign state
 
   // Function to reset the analysis state
   const resetAnalysis = () => {
@@ -68,6 +71,7 @@ export const ChatAnalysisProvider: React.FC<ChatAnalysisProviderProps> = ({ chil
     setAiPrediction(null); // Reset AI results
     setAiPoem(null); // Reset AI Poem
     setAiStyleAnalysis(null);
+    setGeneratedSign(null); // Reset generated sign
     setLastAiCallTime(0);
     setAiCallCount(0);
   };
@@ -100,6 +104,8 @@ export const ChatAnalysisProvider: React.FC<ChatAnalysisProviderProps> = ({ chil
     setLastAiCallTime,
     aiCallCount,
     setAiCallCount,
+    generatedSign, // Provide generated sign state
+    setGeneratedSign, // Provide generated sign setter
   };
 
   return (

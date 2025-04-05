@@ -1,8 +1,8 @@
-import React, { useState, useCallback } from 'react'; // Import useState, useCallback
+import React, { useState, useCallback, useMemo } from 'react'; // Import useMemo
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, BrainCircuit, Feather, Sparkles, Loader2 } from 'lucide-react'; // Import icons
+import { ArrowLeft, BrainCircuit, Feather, Sparkles, Loader2, Users, Smile, HeartCrack, Percent } from 'lucide-react'; // Import icons, added Users, Smile, HeartCrack, Percent
 import { useChatAnalysis } from '@/context/ChatAnalysisContext'; // Import context hook
 import { getFunctions, httpsCallable } from "firebase/functions"; // Import Firebase functions
 import { firebaseApp } from '@/firebaseConfig'; // Import Firebase config
@@ -34,6 +34,66 @@ const anonymizeMessages = (messages: ParsedMessage[]): string => {
     .join('\n'); // Join messages with newline
 };
 
+// Helper function to shuffle an array (Fisher-Yates)
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]; // Swap elements
+  }
+  return shuffled;
+}
+
+// New component for rendering compatibility
+interface RenderCompatibilityProps {
+  analysisResults: ReturnType<typeof useChatAnalysis>['analysisResults'];
+}
+
+const RenderCompatibility: React.FC<RenderCompatibilityProps> = ({ analysisResults }) => {
+  const compatibilityPairs = useMemo(() => {
+    if (!analysisResults || !analysisResults.statsPerSender || Object.keys(analysisResults.statsPerSender).length < 2) {
+      return { pairs: [], leftover: null };
+    }
+
+    const senders = Object.keys(analysisResults.statsPerSender);
+    const shuffledSenders = shuffleArray(senders);
+    const pairs: { p1: string; p2: string; score: number }[] = [];
+    let leftover: string | null = null;
+
+    for (let i = 0; i < shuffledSenders.length; i += 2) {
+      if (i + 1 < shuffledSenders.length) {
+        const score = Math.floor(Math.random() * 70) + 30; // Random % between 30 and 99
+        pairs.push({ p1: shuffledSenders[i], p2: shuffledSenders[i + 1], score });
+      } else {
+        leftover = shuffledSenders[i]; // Odd one out
+      }
+    }
+    return { pairs, leftover };
+  }, [analysisResults]);
+
+  if (!analysisResults || Object.keys(analysisResults.statsPerSender).length < 2) {
+    return <p className="text-sm text-gray-500 italic">Compatibilidade aplicável apenas para 2 ou mais participantes.</p>;
+  }
+
+  return (
+    <div className="space-y-2 text-sm">
+      {compatibilityPairs.pairs.map((pair, index) => (
+        <div key={index} className="flex items-center justify-between p-1 bg-pink-50 rounded-md">
+          <span>{pair.p1} & {pair.p2}</span>
+          <span className="font-semibold text-pink-700">{pair.score}% <Percent className="inline h-3 w-3" /></span>
+        </div>
+      ))}
+      {compatibilityPairs.leftover && (
+        <div className="flex items-center text-gray-600 italic mt-2">
+          <HeartCrack className="w-4 h-4 mr-2 text-gray-500" />
+          <span>{compatibilityPairs.leftover} ficou sem par... 😢</span>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
 const PremiumPage: React.FC = () => {
   const {
     parsedMessages,
@@ -47,7 +107,8 @@ const PremiumPage: React.FC = () => {
     setLastAiCallTime,
     aiCallCount,
     setAiCallCount,
-    analysisResults // Need analysis results for non-AI premium features later
+    analysisResults, // Need analysis results for non-AI premium features later
+    generatedSign // Get the generated sign from context
   } = useChatAnalysis();
 
   const [isPredictionLoading, setIsPredictionLoading] = useState(false);
@@ -107,7 +168,7 @@ const PremiumPage: React.FC = () => {
             mostFrequentEmoji: analysisResults.mostFrequentEmoji,
             favoriteWord: analysisResults.favoriteWord,
             sentimentMix: sentimentMix,
-            // chatSign: generatedSign, // Ideally pass this from ResultsPage context if needed, or handle in function
+            chatSign: generatedSign || "Indefinido", // Pass the sign from context, with a fallback
             // Add a sub-type to differentiate poem/prediction if needed by the function prompt logic
             creativeType: featureType // Send 'prediction' or 'poem'
           };
@@ -165,7 +226,7 @@ const PremiumPage: React.FC = () => {
       else if (featureType === 'poem') setIsPoemLoading(false);
       else if (featureType === 'style') setIsStyleLoading(false);
     }
-  }, [parsedMessages, lastAiCallTime, aiCallCount, setAiPrediction, setAiPoem, setAiStyleAnalysis, setLastAiCallTime, setAiCallCount]);
+  }, [parsedMessages, analysisResults, generatedSign, lastAiCallTime, aiCallCount, setAiPrediction, setAiPoem, setAiStyleAnalysis, setLastAiCallTime, setAiCallCount]); // Add analysisResults and generatedSign to dependencies
 
 
   // TODO: Fetch and display actual non-AI premium content based on context/state (analysisResults)
@@ -256,21 +317,77 @@ const PremiumPage: React.FC = () => {
             {/* Non-AI Premium Content */}
             <h3 className="text-xl font-semibold text-purple-800 mb-3 mt-6">Outras Análises Premium</h3>
             <div className="space-y-4">
-              {/* TODO: Move Passive-Aggressive and Flirtation analysis display here from ResultsPage */}
+              {/* Passive-Aggressive Analysis Card */}
               <Card className="bg-white p-4">
-                <h4 className="font-semibold text-lg text-indigo-700 mb-2">🧐 Análise Passivo-Agressiva Detalhada</h4>
-                <p className="text-gray-600">Carregando detalhes...</p>
-                {/* TODO: Display detailed passive-aggressive analysis using analysisResults */}
+                <CardHeader className="p-0 pb-2">
+                  <CardTitle className="text-lg text-indigo-700 flex items-center"><Users className="w-5 h-5 mr-2 text-orange-600"/> Análise Passivo-Agressiva</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {analysisResults ? (
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center text-base">
+                        <span className="font-medium">Geral (% msgs):</span>
+                        <span className="font-bold text-orange-700">{analysisResults.passiveAggressivePercentage?.toFixed(1) ?? '0.0'}%</span>
+                      </div>
+                      {Object.keys(analysisResults.statsPerSender).length > 1 && (
+                        <div>
+                          <h5 className="text-sm font-semibold mt-3 mb-1 text-gray-600">Por Participante:</h5>
+                          <ul className="list-disc list-inside text-sm space-y-1">
+                            {Object.entries(analysisResults.statsPerSender)
+                              .sort(([, a], [, b]) => (b.passiveAggressivePercentage ?? 0) - (a.passiveAggressivePercentage ?? 0))
+                              .map(([sender, stats]) => (
+                                <li key={sender}>
+                                  <span className="font-medium">{sender}:</span> {stats.passiveAggressivePercentage?.toFixed(1) ?? '0.0'}%
+                                </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 italic">Dados de análise não disponíveis.</p>
+                  )}
+                </CardContent>
               </Card>
+
+              {/* Flirtation Analysis Card */}
               <Card className="bg-white p-4">
-                <h4 className="font-semibold text-lg text-indigo-700 mb-2">💖 Análise de Flerte Detalhada</h4>
-                <p className="text-gray-600">Carregando detalhes...</p>
-                {/* TODO: Display detailed flirtation analysis using analysisResults */}
+                 <CardHeader className="p-0 pb-2">
+                   <CardTitle className="text-lg text-indigo-700 flex items-center"><Smile className="w-5 h-5 mr-2 text-pink-500"/> Análise de Flerte</CardTitle>
+                 </CardHeader>
+                 <CardContent className="p-0">
+                   {analysisResults ? (
+                     <div className="space-y-3">
+                       <div className="flex justify-between items-center text-base">
+                         <span className="font-medium">Geral (% msgs):</span>
+                         <span className="font-bold text-pink-600">{analysisResults.flirtationPercentage?.toFixed(1) ?? '0.0'}%</span>
+                       </div>
+                       {Object.keys(analysisResults.statsPerSender).length > 1 && (
+                         <div>
+                           <h5 className="text-sm font-semibold mt-3 mb-1 text-gray-600">Por Participante:</h5>
+                           <ul className="list-disc list-inside text-sm space-y-1">
+                             {Object.entries(analysisResults.statsPerSender)
+                               .sort(([, a], [, b]) => (b.flirtationPercentage ?? 0) - (a.flirtationPercentage ?? 0))
+                               .map(([sender, stats]) => (
+                                 <li key={sender}>
+                                   <span className="font-medium">{sender}:</span> {stats.flirtationPercentage?.toFixed(1) ?? '0.0'}%
+                                 </li>
+                             ))}
+                           </ul>
+                         </div>
+                       )}
+                       {/* Compatibility Section */}
+                       <div className="pt-3 mt-3 border-t border-gray-200">
+                          <h5 className="text-sm font-semibold mb-2 text-gray-600">💘 Compatibilidade Amorosa:</h5>
+                          <RenderCompatibility analysisResults={analysisResults} />
+                       </div>
+                     </div>
+                   ) : (
+                     <p className="text-gray-500 italic">Dados de análise não disponíveis.</p>
+                   )}
+                 </CardContent>
               </Card>
             </div>
-            <p className="mt-8 text-sm text-center text-gray-500">
-              (Conteúdo premium real será implementado futuramente)
-            </p>
           </CardContent>
         </Card>
       </main>
