@@ -1,11 +1,12 @@
-import React, { useState, useCallback, useMemo } from 'react'; // Import useMemo
+import React, { useState, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, BrainCircuit, Feather, Sparkles, Loader2, Users, Smile, HeartCrack, Percent } from 'lucide-react'; // Import icons, added Users, Smile, HeartCrack, Percent
-import { useChatAnalysis } from '@/context/ChatAnalysisContext'; // Import context hook
-import { getFunctions, httpsCallable } from "firebase/functions"; // Import Firebase functions
-import { firebaseApp } from '@/firebaseConfig'; // Import Firebase config
+import { Separator } from '@/components/ui/separator';
+import { ArrowLeft, BrainCircuit, Feather, Sparkles, Loader2, Users, Smile, HeartCrack, Percent, ThumbsUp, ThumbsDown, UserCheck } from 'lucide-react'; // Added UserCheck
+import { useChatAnalysis } from '@/context/ChatAnalysisContext';
+import { getFunctions, httpsCallable } from "firebase/functions";
+import { firebaseApp } from '@/firebaseConfig';
 import { toast } from 'sonner'; // Import toast
 import type { ParsedMessage } from '../lib/parseChat'; // Import ParsedMessage type
 
@@ -107,15 +108,19 @@ const PremiumPage: React.FC = () => {
     setLastAiCallTime,
     aiCallCount,
     setAiCallCount,
-    analysisResults, // Need analysis results for non-AI premium features later
-    generatedSign // Get the generated sign from context
+    analysisResults,
+    generatedSign,
+    selectedSender, // Get selected sender to highlight
+    aiFlagPersonalityAnalysis, // Get the new AI analysis state
+    setAiFlagPersonalityAnalysis // Get the setter for the new state
   } = useChatAnalysis();
 
   const [isPredictionLoading, setIsPredictionLoading] = useState(false);
   const [isPoemLoading, setIsPoemLoading] = useState(false);
   const [isStyleLoading, setIsStyleLoading] = useState(false);
+  const [isFlagPersonalityLoading, setIsFlagPersonalityLoading] = useState(false); // Add loading state for flag personality
 
-  const callAIFeature = useCallback(async (featureType: 'prediction' | 'poem' | 'style') => {
+  const callAIFeature = useCallback(async (featureType: 'prediction' | 'poem' | 'style' | 'flagPersonality') => {
     const now = Date.now();
 
     // Rate Limiting Check
@@ -137,6 +142,7 @@ const PremiumPage: React.FC = () => {
     if (featureType === 'prediction') setIsPredictionLoading(true);
     else if (featureType === 'poem') setIsPoemLoading(true);
     else if (featureType === 'style') setIsStyleLoading(true);
+    else if (featureType === 'flagPersonality') setIsFlagPersonalityLoading(true);
 
     try {
       // Prepare data for the Cloud Function
@@ -145,7 +151,8 @@ const PremiumPage: React.FC = () => {
       const contextLimit = 500;
       const limitedChat = anonymizedChat.split('\n').slice(-contextLimit).join('\n');
 
-      let taskType: "generateCreativeText" | "analyzeCommunicationStyle";
+      // Correct the type definition for taskType to include the new type
+      let taskType: "generateCreativeText" | "analyzeCommunicationStyle" | "analyzeFlagsPersonality";
       let payload: any;
 
       switch (featureType) {
@@ -180,6 +187,30 @@ const PremiumPage: React.FC = () => {
             charLimit: contextLimit,
           };
           break;
+        case 'flagPersonality':
+          taskType = "analyzeFlagsPersonality";
+          if (!analysisResults?.statsPerSender) {
+            toast.error("Dados de análise por participante não encontrados.");
+            throw new Error("Sender stats missing for flag personality analysis.");
+          }
+          // Prepare payload with only flag keywords per sender
+          payload = Object.entries(analysisResults.statsPerSender).reduce((acc, [sender, stats]) => {
+            if (stats && (stats.redFlagKeywords?.length > 0 || stats.greenFlagKeywords?.length > 0)) {
+              acc[sender] = {
+                redFlagKeywords: stats.redFlagKeywords,
+                greenFlagKeywords: stats.greenFlagKeywords,
+              };
+            }
+            return acc;
+          }, {} as Record<string, { redFlagKeywords: string[], greenFlagKeywords: string[] }>);
+
+          if (Object.keys(payload).length === 0) {
+             toast.info("Nenhum participante com Red/Green flags encontradas para análise de personalidade.");
+             // No need to call the function if payload is empty
+             setIsFlagPersonalityLoading(false); // Reset loading state immediately
+             return; // Exit early
+          }
+          break;
         default:
            toast.error("Tipo de recurso de IA desconhecido.");
            throw new Error("Unknown AI feature type."); // Throw to exit and reset loading
@@ -192,17 +223,49 @@ const PremiumPage: React.FC = () => {
 
       // Call the Cloud Function with the correct structure
       const result = await callGeminiFunction({ taskType, payload });
-      // The function now returns { success: true, result: "..." }
-      const textResult = (result?.data as any)?.result?.trim() || null;
 
-      if (!(result?.data as any)?.success || !textResult) {
-        throw new Error("A IA não retornou um resultado válido.");
+      // Check for general success first
+      if (!(result?.data as any)?.success) {
+        // Extract potential error message from function response if available
+        const errorMessage = (result?.data as any)?.error || "A IA não retornou um resultado válido ou indicou uma falha.";
+        throw new Error(errorMessage);
       }
 
-      // Update context state based on feature type
-      if (featureType === 'prediction') setAiPrediction(textResult);
-      else if (featureType === 'poem') setAiPoem(textResult);
-      else if (featureType === 'style') setAiStyleAnalysis(textResult);
+      // Process result based on feature type
+      if (featureType === 'prediction' || featureType === 'poem' || featureType === 'style') {
+        const textResult = (result?.data as any)?.result;
+        if (typeof textResult === 'string') {
+          const trimmedResult = textResult.trim();
+          if (trimmedResult) {
+            if (featureType === 'prediction') setAiPrediction(trimmedResult);
+            else if (featureType === 'poem') setAiPoem(trimmedResult);
+            else if (featureType === 'style') setAiStyleAnalysis(trimmedResult);
+          } else {
+             throw new Error(`A IA retornou um texto vazio para ${featureType}.`);
+          }
+        } else {
+          throw new Error(`A IA não retornou um texto válido para ${featureType}. Tipo recebido: ${typeof textResult}`);
+        }
+      }
+      // Handle the JSON object result for flag personality
+      else if (featureType === 'flagPersonality') {
+         const personalityResult = (result?.data as any)?.result; // Expecting an object
+         if (typeof personalityResult === 'object' && personalityResult !== null) {
+            // Check if the object is empty (which might be valid if no analysis was possible)
+            if (Object.keys(personalityResult).length === 0) {
+               toast.info("Nenhuma análise de personalidade gerada (sem flags suficientes?).");
+               setAiFlagPersonalityAnalysis({}); // Set to empty object
+            } else {
+               setAiFlagPersonalityAnalysis(personalityResult as Record<string, string>);
+            }
+         } else {
+            console.error("Received unexpected format for flag personality analysis:", personalityResult);
+            toast.error("Formato inesperado recebido da análise de personalidade por flags.");
+            setAiFlagPersonalityAnalysis(null); // Reset or handle error state
+            // Optionally throw an error if this state is unexpected
+            // throw new Error(`Formato inesperado para ${featureType}. Tipo recebido: ${typeof personalityResult}`);
+         }
+      }
 
       // Update rate limiting state
       setLastAiCallTime(now);
@@ -225,8 +288,9 @@ const PremiumPage: React.FC = () => {
       if (featureType === 'prediction') setIsPredictionLoading(false);
       else if (featureType === 'poem') setIsPoemLoading(false);
       else if (featureType === 'style') setIsStyleLoading(false);
+      else if (featureType === 'flagPersonality') setIsFlagPersonalityLoading(false);
     }
-  }, [parsedMessages, analysisResults, generatedSign, lastAiCallTime, aiCallCount, setAiPrediction, setAiPoem, setAiStyleAnalysis, setLastAiCallTime, setAiCallCount]); // Add analysisResults and generatedSign to dependencies
+  }, [parsedMessages, analysisResults, generatedSign, lastAiCallTime, aiCallCount, setAiPrediction, setAiPoem, setAiStyleAnalysis, setAiFlagPersonalityAnalysis, setLastAiCallTime, setAiCallCount]); // Added setAiFlagPersonalityAnalysis
 
 
   // TODO: Fetch and display actual non-AI premium content based on context/state (analysisResults)
@@ -384,6 +448,37 @@ const PremiumPage: React.FC = () => {
                      </div>
                    ) : (
                      <p className="text-gray-500 italic">Dados de análise não disponíveis.</p>
+                   )}
+                 </CardContent>
+              </Card>
+
+              {/* AI Flag Personality Analysis Card */}
+              <Card className="bg-white p-4">
+                 <CardHeader className="p-0 pb-2 flex flex-row items-center justify-between">
+                   <CardTitle className="text-lg text-indigo-700 flex items-center"><UserCheck className="w-5 h-5 mr-2 text-teal-600"/> Personalidade por Sinais (IA)</CardTitle>
+                   {/* Ensure callAIFeature type includes 'flagPersonality' */}
+                   <Button size="sm" onClick={() => callAIFeature('flagPersonality')} disabled={isPredictionLoading || isPoemLoading || isStyleLoading || isFlagPersonalityLoading}>
+                     {isFlagPersonalityLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BrainCircuit className="mr-2 h-4 w-4"/>}
+                     Analisar Flags
+                   </Button>
+                 </CardHeader>
+                 <CardContent className="p-0">
+                   {isFlagPersonalityLoading ? (
+                     <p className="text-gray-500 italic">Analisando personalidades com base nas flags...</p>
+                   ) : aiFlagPersonalityAnalysis && Object.keys(aiFlagPersonalityAnalysis).length > 0 ? (
+                     <div className="space-y-2 mt-2">
+                       {Object.entries(aiFlagPersonalityAnalysis).map(([sender, analysis]) => (
+                         // Corrected JSX structure for mapping
+                         <div key={sender} className={`p-2 rounded ${sender === selectedSender ? 'bg-blue-50' : ''}`}>
+                           <p className="font-semibold text-sm text-gray-800">{sender}:</p>
+                           <p className="text-sm text-gray-600">{analysis}</p>
+                         </div>
+                       ))}
+                     </div>
+                   ) : aiFlagPersonalityAnalysis && Object.keys(aiFlagPersonalityAnalysis).length === 0 ? (
+                      <p className="text-gray-500 italic">Nenhuma análise de personalidade gerada (sem flags suficientes?).</p>
+                   ) : (
+                     <p className="text-gray-500 italic">Clique em "Analisar Flags" para gerar uma análise de personalidade baseada nas Red/Green flags de cada participante.</p>
                    )}
                  </CardContent>
               </Card>

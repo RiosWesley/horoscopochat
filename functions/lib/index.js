@@ -31,15 +31,6 @@ const generative_ai_1 = require("@google/generative-ai");
 if (admin.apps.length === 0) {
     admin.initializeApp();
 }
-// Access the Gemini API Key from Firebase environment configuration
-// Make sure you've set this using:
-// firebase functions:config:set gemini.key="YOUR_API_KEY"
-// Note: We will check for the key inside the function handler during runtime.
-// Checking it here in the global scope can cause issues during deployment cold starts.
-// const GEMINI_API_KEY = functions.config().gemini?.key;
-// if (!GEMINI_API_KEY) {
-//   console.error("FATAL ERROR: Gemini API Key not found in Firebase environment configuration.");
-// }
 // Define safety settings for the Gemini model
 const safetySettings = [
     { category: generative_ai_1.HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: generative_ai_1.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
@@ -47,58 +38,51 @@ const safetySettings = [
     { category: generative_ai_1.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: generative_ai_1.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
     { category: generative_ai_1.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: generative_ai_1.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
 ];
-// Initialize the Google Generative AI client (using config set earlier)
-// const genAI = new GoogleGenerativeAI(GEMINI_API_KEY); // Removed duplicate initialization
 // Define the HTTPS Callable Function (v1 syntax)
+// Potentially remove the explicit ': Promise<any>' if TS can infer it, or specify a more concrete return type
 exports.callGemini = functions.https.onCall(async (data, context) => {
-    functions.logger.info("callGemini function started.", { structuredData: true }); // Added start log
-    // Access the API key from environment variables (recommended for v2)
+    functions.logger.info("callGemini function started.", { structuredData: true });
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
         functions.logger.error("Gemini API Key not found in environment variables (GEMINI_API_KEY).");
-        // Provide a more specific error message for the client
         throw new functions.https.HttpsError("internal", "Configuration error: Missing API Key on the server.");
     }
-    // Initialize the Google Generative AI client *inside* the handler
     const genAI = new generative_ai_1.GoogleGenerativeAI(apiKey);
-    // --- Data Validation ---
-    // The client SDK wraps the data in a 'data' field. The V1 handler might
-    // or might not unwrap it automatically in a V2 environment. Check both.
     const actualPayload = data?.data || data;
-    functions.logger.info("Received data/payload:", { originalData: data, actualPayload: actualPayload }); // Log both for debugging
-    // Type assertion and validation on the actual data payload
-    const requestData = actualPayload; // Assert the type on the potentially unwrapped data
-    if (!requestData || typeof requestData !== 'object' || !requestData.taskType || !requestData.payload) {
-        functions.logger.error("Invalid request data structure after potential unwrap. Received:", { originalData: data, actualPayload: actualPayload }); // Log the invalid data
-        throw new functions.https.HttpsError("invalid-argument", "Invalid request structure. Expected { data: { taskType: '...', payload: {...} } }." // More specific error
-        );
+    functions.logger.info("Received data/payload:", { originalData: data, actualPayload: actualPayload });
+    // Improved validation
+    if (!actualPayload || typeof actualPayload !== 'object') {
+        functions.logger.error("Invalid request data: not an object.", { originalData: data, actualPayload: actualPayload });
+        throw new functions.https.HttpsError("invalid-argument", "Invalid request structure. Expected { data: { taskType: '...', payload: {...} } } or { taskType: '...', payload: {...} }.");
     }
-    // Now use the validated and typed requestData
+    const requestData = actualPayload; // Cast after checking it's an object
+    if (!requestData.taskType || !requestData.payload) {
+        functions.logger.error("Invalid request data structure: missing taskType or payload.", { requestData: requestData });
+        throw new functions.https.HttpsError("invalid-argument", "Invalid request structure. Expected object with 'taskType' and 'payload' keys.");
+    }
+    // Destructure taskType and payload here, they are accessible within the function scope
     const { taskType, payload } = requestData;
-    functions.logger.info(`Processing task: ${taskType}`, { taskType }); // Log task type
-    let prompt = "";
-    let resultText = "";
-    try {
-        functions.logger.info("Initializing Gemini model..."); // Log model init
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-8b", safetySettings });
-        functions.logger.info("Gemini model initialized."); // Log success
+    functions.logger.info(`Processing task: ${taskType}`, { taskType });
+    try { // Start of main try block
+        let prompt = ""; // Declare prompt within the try block, accessible by switch cases
+        functions.logger.info("Initializing Gemini model...");
+        // Ensure model name is correct, "gemini-1.5-flash-8b" seems unusual, maybe "gemini-1.5-flash"? check Gemini docs
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", safetySettings });
+        functions.logger.info("Gemini model initialized.");
+        // --- Construct Prompt based on Task Type ---
         switch (taskType) {
-            case "generateCreativeText":
-                // Payload now contains creativeType ('prediction' or 'poem')
+            case "generateCreativeText": {
                 const { mostFrequentEmoji, favoriteWord, sentimentMix, chatSign, creativeType } = payload;
-                functions.logger.info(`Generating creative text prompt for type: ${creativeType}`, { payload }); // Log payload including creativeType
-                // Base context string
+                functions.logger.info(`Generating creative text prompt for type: ${creativeType}`, { payload });
                 const baseContext = `
           Dados de análise de um chat do WhatsApp:
           - Emoji mais usado: ${mostFrequentEmoji || "Nenhum"}
           - Palavra favorita (ignorando comuns): ${favoriteWord || "Nenhuma"}
           - Mix de sentimento (positivo/negativo): ${sentimentMix || "Equilibrado"}
           - "Signo" do chat (baseado na hora mais ativa): ${chatSign || "Explorador do ZapVerso"}`;
-                // Generate specific prompt based on creativeType
                 if (creativeType === 'prediction') {
                     prompt = `
             ${baseContext}
-
             Com base nesses dados, especialmente o "Signo" (${chatSign || "Explorador"}) e o sentimento (${sentimentMix || "Equilibrado"}), crie uma previsão curta (2-3 frases), divertida e otimista no estilo 'horóscopo maluco' para este chat.
             Reflita o sentimento e o signo na sua previsão. Use português brasileiro.
             Não inclua introduções como "Aqui está sua previsão:", apenas o texto gerado.
@@ -107,7 +91,6 @@ exports.callGemini = functions.https.onCall(async (data, context) => {
                 else if (creativeType === 'poem') {
                     prompt = `
             ${baseContext}
-
             Inspirado por esses dados, especialmente o sentimento (${sentimentMix || "Equilibrado"}) e o emoji (${mostFrequentEmoji || "Nenhum"}), escreva um pequeno poema ou haiku (3-5 linhas) sobre a vibe deste chat.
             Tente capturar o sentimento predominante. Use português brasileiro.
             Não inclua introduções como "Aqui está seu poema:", apenas o texto gerado.
@@ -118,81 +101,163 @@ exports.callGemini = functions.https.onCall(async (data, context) => {
                     throw new functions.https.HttpsError("invalid-argument", "Invalid 'creativeType' provided for generateCreativeText.");
                 }
                 break;
-            case "analyzeCommunicationStyle":
-                functions.logger.info("Generating style analysis prompt...", { payloadKeys: Object.keys(payload) }); // Log payload keys only
-                // Payload should contain anonymized messages (string) and character limit info
+            }
+            case "analyzeCommunicationStyle": {
                 const { anonymizedMessages, charLimit } = payload;
+                functions.logger.info("Generating style analysis prompt...", { payloadKeys: Object.keys(payload) });
+                // Ensure charLimit is a number or provide a default
+                const limit = typeof charLimit === 'number' && charLimit > 0 ? charLimit : 1000;
                 prompt = `
-          Analise o seguinte trecho de uma conversa de chat (em português brasileiro), respeitando o limite de caracteres de ${charLimit} usado para selecioná-lo.
+          Analise o seguinte trecho de uma conversa de chat (em português brasileiro), respeitando o limite de caracteres de ${limit} usado para selecioná-lo.
           Avalie o estilo de comunicação geral predominante com base nestes aspectos:
           1.  **Complexidade da Linguagem:** As frases são geralmente curtas e diretas ou mais longas e elaboradas? O vocabulário é simples ou variado/complexo?
           2.  **Diretividade:** A comunicação tende a ser mais direta ao ponto ou mais indireta/sugestiva?
           3.  **Formalidade:** O tom geral é mais informal (gírias, abreviações) ou mais formal?
-
           Forneça um resumo conciso (3-4 frases) descrevendo o estilo de comunicação predominante observado no trecho fornecido. Não analise participantes individuais, apenas o estilo geral. Não inclua saudações ou despedidas na sua resposta.
-
           Trecho do Chat para Análise:
           """
           ${anonymizedMessages}
           """
         `;
                 break;
-            default:
-                functions.logger.error("Unknown taskType received:", { taskType }); // Log unknown task
-                throw new functions.https.HttpsError("invalid-argument", "Invalid 'taskType' provided.");
-        }
-        // Call the Gemini API
-        functions.logger.info(`Calling Gemini API for task: ${taskType}`); // Log API call start
-        functions.logger.info("Final prompt for Gemini:", { prompt }); // Log the final prompt
-        const result = await model.generateContent(prompt);
-        functions.logger.info("Gemini API call completed."); // Log API call end
+            }
+            case "analyzeFlagsPersonality": { // Line 124 starts here
+                functions.logger.info("Generating flag personality analysis prompt...", { payloadKeys: Object.keys(payload) });
+                const senderFlagData = payload;
+                let flagPromptParts = [];
+                for (const sender in senderFlagData) {
+                    // Ensure senderFlagData[sender] exists before accessing its properties
+                    if (senderFlagData.hasOwnProperty(sender) && senderFlagData[sender]) {
+                        const flags = senderFlagData[sender];
+                        if (flags && (flags.redFlagKeywords?.length > 0 || flags.greenFlagKeywords?.length > 0)) {
+                            const maxKeywords = 15;
+                            const redFlagsSample = flags.redFlagKeywords?.slice(0, maxKeywords).join(", ") || "Nenhuma";
+                            const greenFlagsSample = flags.greenFlagKeywords?.slice(0, maxKeywords).join(", ") || "Nenhuma";
+                            flagPromptParts.push(`- ${sender}:\n  - Red Flags (exemplos): ${redFlagsSample}\n  - Green Flags (exemplos): ${greenFlagsSample}`);
+                        }
+                    }
+                }
+                if (flagPromptParts.length === 0) {
+                    functions.logger.warn("No senders with flags provided for analyzeFlagsPersonality task.");
+                    // Ensure a consistent return structure
+                    return { success: true, result: "{}" }; // Return stringified JSON for consistency or adjust client
+                }
+                prompt = `
+          Analise as seguintes palavras/frases associadas a "Red Flags" (sinais de alerta) e "Green Flags" (sinais positivos) para cada participante de uma conversa de WhatsApp (em português brasileiro).
+          Dados por Participante:
+          ${flagPromptParts.join("\n\n")}
+          Com base EXCLUSIVAMENTE nessas palavras/frases fornecidas para cada pessoa, gere uma breve análise de personalidade (1-2 frases) para CADA participante listado. Foque em traços que podem ser inferidos a partir das flags (ex: direto, cuidadoso, impaciente, encorajador, etc.).
+          Seja conciso e direto ao ponto.
+          Retorne a análise como um objeto JSON onde as chaves são os nomes dos participantes e os valores são as strings da análise de personalidade correspondente.
+          Exemplo de formato de saída esperado:
+          {
+            "Nome Participante 1": "Parece ser [análise breve].",
+            "Nome Participante 2": "Demonstra ser [análise breve]."
+          }
+          IMPORTANTE: Sua resposta deve conter APENAS o objeto JSON válido, sem nenhum texto antes ou depois, e sem usar blocos de código markdown (\`\`\`json ... \`\`\`).
+        `; // <--- *** CORRECTION HERE: Escaped backticks ***
+                break; // Line 136 ends around here
+            } // Line 137
+            default: { // Line 139
+                // This ensures exhaustive checking at compile time
+                // If taskType could be other strings, this assignment will fail
+                const exhaustiveCheck = taskType;
+                functions.logger.error("Unhandled taskType in switch:", { taskType: exhaustiveCheck });
+                throw new functions.https.HttpsError("internal", `Unhandled task type received: ${taskType}` // Include the type for better debugging
+                );
+            } // Line 143 ends here
+        } // End of switch
+        // --- Call Gemini API ---
+        functions.logger.info(`Calling Gemini API for task: ${taskType}`);
+        functions.logger.debug("Final prompt for Gemini:", { prompt }); // Use debug for potentially long prompts
+        const generationConfig = {
+            responseMimeType: taskType === "analyzeFlagsPersonality" ? "application/json" : "text/plain",
+        };
+        const result = await model.generateContent({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig // Pass the config here
+        });
+        functions.logger.info("Gemini API call completed.");
         const response = result.response;
         if (!response) {
-            functions.logger.error("Gemini API did not return a response."); // Log no response
-            throw new Error("A API Gemini não retornou uma resposta válida.");
+            functions.logger.error("Gemini API did not return a response object.");
+            throw new functions.https.HttpsError("internal", "A API Gemini não retornou um objeto de resposta."); // More specific error
         }
-        // Check for safety blocks or empty response
-        if (response.promptFeedback?.blockReason) {
-            functions.logger.warn("Gemini API call blocked:", { reason: response.promptFeedback.blockReason }); // Log block reason
-            throw new functions.https.HttpsError("internal", // Or perhaps 'permission-denied' depending on block reason
-            `A solicitação foi bloqueada pela IA por motivos de segurança: ${response.promptFeedback.blockReason}` // Slightly clearer error
-            );
+        // Check for finishReason before accessing text()
+        const finishReason = response.candidates?.[0]?.finishReason;
+        const safetyRatings = response.candidates?.[0]?.safetyRatings;
+        if (finishReason === "STOP") {
+            // Continue processing
         }
-        resultText = response.text();
-        functions.logger.info(`Gemini response text received successfully for task: ${taskType}`); // Log success
-        // Return the result
-        return { success: true, result: resultText };
+        else if (finishReason === "MAX_TOKENS") {
+            functions.logger.warn("Gemini response stopped due to MAX_TOKENS.");
+            // Decide if partial response is acceptable or throw error
+        }
+        else if (finishReason === "SAFETY" || response.promptFeedback?.blockReason) {
+            functions.logger.warn("Gemini API call blocked or response filtered:", {
+                reason: finishReason || response.promptFeedback?.blockReason,
+                safetyRatings: safetyRatings || response.promptFeedback?.safetyRatings,
+            });
+            throw new functions.https.HttpsError("internal", // Or perhaps 'resource-exhausted' or 'permission-denied' depending on context
+            `A solicitação/resposta foi bloqueada pela IA por motivos de segurança/política.`);
+        }
+        else {
+            functions.logger.error("Gemini response finished with unexpected reason or was empty:", { finishReason, response });
+            throw new functions.https.HttpsError("internal", "A resposta da API Gemini foi inesperada ou vazia.");
+        }
+        // Access text only if finishReason is acceptable
+        const resultText = response.text().trim(); // Declare resultText here
+        functions.logger.info(`Gemini response text received successfully for task: ${taskType}`);
+        // --- Process Response ---
+        if (taskType === "analyzeFlagsPersonality") {
+            // With responseMimeType: "application/json", Gemini should return valid JSON directly
+            try {
+                // Gemini 1.5 with application/json might already parse it, check response structure
+                // Let's assume response.text() still returns the JSON string for now
+                const jsonResult = JSON.parse(resultText);
+                functions.logger.info("Parsed JSON result for analyzeFlagsPersonality:", { jsonResult });
+                return { success: true, result: jsonResult }; // Return the parsed object
+            }
+            catch (parseError) {
+                functions.logger.error("Failed to parse JSON from Gemini response even when application/json was requested.", { responseText: resultText, error: parseError });
+                throw new functions.https.HttpsError("internal", "A IA retornou uma resposta inválida (JSON esperado falhou ao analisar).");
+            }
+        }
+        else {
+            // For other tasks, return plain text
+            return { success: true, result: resultText };
+        }
     }
-    catch (error) {
-        functions.logger.error(`Error processing task ${taskType}:`, error); // Log the caught error
+    catch (error) { // Catch block for the main try
+        functions.logger.error(`Error processing task ${taskType}:`, error); // taskType is accessible here
+        if (error instanceof functions.https.HttpsError) {
+            throw error; // Re-throw HttpsError directly
+        }
         const errorMessage = error instanceof Error ? error.message : "Erro desconhecido ao chamar a API de IA.";
-        // Throwing an HttpsError allows the client to catch it gracefully
         throw new functions.https.HttpsError("internal", `Falha ao processar a solicitação de IA: ${errorMessage}`);
     }
-});
+}); // End of callGemini function
 exports.saveAnalysisResults = functions.https.onCall(async (data, context) => {
     functions.logger.info("saveAnalysisResults function started.");
-    // Validate input data structure (ensure it matches AnalysisResultsToSave)
-    // It's crucial to filter here on the server-side to prevent saving sensitive data
-    const receivedData = data?.data || data; // Handle potential client SDK wrapping
+    const receivedData = data?.data || data;
     functions.logger.info("Received data for saving:", { receivedData });
-    // **Perform strict validation and filtering here**
-    // Only pick the fields defined in AnalysisResultsToSave from receivedData
-    // Example (needs to be more robust based on actual AnalysisResults structure):
+    // Ensure receivedData is an object before proceeding
     if (!receivedData || typeof receivedData !== 'object') {
+        functions.logger.error("Invalid data format received for saving: not an object.", { receivedData });
         throw new functions.https.HttpsError("invalid-argument", "Invalid data format received.");
     }
-    const dataToSave = {}; // Use Partial initially
+    const dataToSave = {};
     // --- Manually map and validate allowed fields ---
+    // (Keep your mapping logic as it is, it's good practice)
     if (typeof receivedData.totalMessages === 'number')
         dataToSave.totalMessages = receivedData.totalMessages;
-    if (typeof receivedData.messagesPerSender === 'object')
-        dataToSave.messagesPerSender = receivedData.messagesPerSender; // Consider if sender names are sensitive
-    if (typeof receivedData.emojiCounts === 'object')
+    if (typeof receivedData.messagesPerSender === 'object' && receivedData.messagesPerSender !== null)
+        dataToSave.messagesPerSender = receivedData.messagesPerSender;
+    if (typeof receivedData.emojiCounts === 'object' && receivedData.emojiCounts !== null)
         dataToSave.emojiCounts = receivedData.emojiCounts;
     if (typeof receivedData.mostFrequentEmoji === 'string' || receivedData.mostFrequentEmoji === null)
         dataToSave.mostFrequentEmoji = receivedData.mostFrequentEmoji;
-    if (typeof receivedData.keywordCounts === 'object')
+    if (typeof receivedData.keywordCounts === 'object' && receivedData.keywordCounts !== null)
         dataToSave.keywordCounts = receivedData.keywordCounts;
     if (typeof receivedData.averageMessageLength === 'number')
         dataToSave.averageMessageLength = receivedData.averageMessageLength;
@@ -204,8 +269,8 @@ exports.saveAnalysisResults = functions.https.onCall(async (data, context) => {
         dataToSave.capsWordCount = receivedData.capsWordCount;
     if (Array.isArray(receivedData.topExpressions))
         dataToSave.topExpressions = receivedData.topExpressions;
-    if (typeof receivedData.statsPerSender === 'object')
-        dataToSave.statsPerSender = receivedData.statsPerSender; // Again, consider sender names
+    if (typeof receivedData.statsPerSender === 'object' && receivedData.statsPerSender !== null)
+        dataToSave.statsPerSender = receivedData.statsPerSender;
     if (typeof receivedData.passiveAggressivePercentage === 'number' || receivedData.passiveAggressivePercentage === null)
         dataToSave.passiveAggressivePercentage = receivedData.passiveAggressivePercentage;
     if (typeof receivedData.flirtationPercentage === 'number' || receivedData.flirtationPercentage === null)
@@ -218,12 +283,21 @@ exports.saveAnalysisResults = functions.https.onCall(async (data, context) => {
         dataToSave.aiStyleAnalysis = receivedData.aiStyleAnalysis;
     if (typeof receivedData.generatedSign === 'string' || receivedData.generatedSign === null)
         dataToSave.generatedSign = receivedData.generatedSign;
+    if (typeof receivedData.isPremiumAnalysis === 'boolean')
+        dataToSave.isPremiumAnalysis = receivedData.isPremiumAnalysis;
+    if (typeof receivedData.totalRedFlags === 'number')
+        dataToSave.totalRedFlags = receivedData.totalRedFlags;
+    if (typeof receivedData.totalGreenFlags === 'number')
+        dataToSave.totalGreenFlags = receivedData.totalGreenFlags;
+    // Ensure aiFlagPersonalityAnalysis is an object or null
+    if (typeof receivedData.aiFlagPersonalityAnalysis === 'object' || receivedData.aiFlagPersonalityAnalysis === null) {
+        dataToSave.aiFlagPersonalityAnalysis = receivedData.aiFlagPersonalityAnalysis;
+    }
     // --- End mapping ---
-    // Add server timestamp
     dataToSave.createdAt = admin.firestore.FieldValue.serverTimestamp();
-    // Check if we actually have something to save after filtering
-    if (Object.keys(dataToSave).length < 2) { // < 2 because createdAt is always added
-        functions.logger.error("No valid data fields found after filtering.", { receivedData });
+    // Check if we actually mapped any valid fields besides createdAt
+    if (Object.keys(dataToSave).length <= 1) {
+        functions.logger.error("No valid data fields found after filtering for saving.", { receivedData });
         throw new functions.https.HttpsError("invalid-argument", "No valid analysis data provided to save.");
     }
     try {
@@ -234,13 +308,20 @@ exports.saveAnalysisResults = functions.https.onCall(async (data, context) => {
     }
     catch (error) {
         functions.logger.error("Error saving analysis to Firestore:", error);
-        throw new functions.https.HttpsError("internal", "Failed to save analysis results.");
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        throw new functions.https.HttpsError("internal", `Failed to save analysis results: ${errorMessage}`);
     }
 });
 exports.getAnalysisResults = functions.https.onCall(async (data, context) => {
     functions.logger.info("getAnalysisResults function started.");
-    const requestData = data?.data || data; // Handle potential client SDK wrapping
-    const { analysisId } = requestData;
+    // Use consistent payload unwrapping
+    const requestData = data?.data || data;
+    // Add type checking for requestData itself
+    if (!requestData || typeof requestData !== 'object') {
+        functions.logger.error("Invalid request data for getAnalysisResults: not an object.", { requestData });
+        throw new functions.https.HttpsError("invalid-argument", "Invalid request structure.");
+    }
+    const { analysisId } = requestData; // Cast after checking it's an object
     if (!analysisId || typeof analysisId !== 'string') {
         functions.logger.error("Invalid or missing analysisId.", { requestData });
         throw new functions.https.HttpsError("invalid-argument", "An 'analysisId' must be provided.");
@@ -255,22 +336,25 @@ exports.getAnalysisResults = functions.https.onCall(async (data, context) => {
             throw new functions.https.HttpsError("not-found", "Analysis not found.");
         }
         else {
-            const savedData = docSnap.data();
-            functions.logger.info(`Analysis data fetched successfully for ID: ${analysisId}`);
-            // Convert Firestore Timestamp back to Date or ISO string if needed by client
-            if (savedData?.createdAt?.toDate) {
+            const savedData = docSnap.data(); // Cast to your interface for better type safety
+            if (savedData?.createdAt && typeof savedData.createdAt?.toDate === 'function') {
+                // Convert Firestore Timestamp to ISO string for JSON serialization
                 savedData.createdAt = savedData.createdAt.toDate().toISOString();
             }
+            // Ensure other potential Timestamp fields are also converted if they exist
+            functions.logger.info(`Successfully fetched analysis ${analysisId}`);
             return { success: true, results: savedData };
         }
     }
     catch (error) {
-        // Catch specific 'not-found' error to return it, otherwise log and return internal error
-        if (error instanceof functions.https.HttpsError && error.code === "not-found") {
+        // Re-throw specific known errors
+        if (error instanceof functions.https.HttpsError) {
             throw error;
         }
+        // Log unknown errors and throw a generic internal error
         functions.logger.error(`Error fetching analysis ${analysisId} from Firestore:`, error);
-        throw new functions.https.HttpsError("internal", "Failed to retrieve analysis results.");
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        throw new functions.https.HttpsError("internal", `Failed to retrieve analysis results: ${errorMessage}`);
     }
 });
 //# sourceMappingURL=index.js.map

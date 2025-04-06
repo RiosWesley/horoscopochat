@@ -34,6 +34,10 @@ interface ChatAnalysisContextType {
   setAiCallCount: (count: number) => void;
   generatedSign: string | null; // Add state for the generated sign
   setGeneratedSign: (sign: string | null) => void; // Add setter for the sign
+  selectedSender: string | null; // Add state for the user-selected sender
+  setSelectedSender: (sender: string | null) => void; // Add setter for the selected sender
+  aiFlagPersonalityAnalysis: Record<string, string> | null; // Add state for AI flag personality analysis
+  setAiFlagPersonalityAnalysis: (analysis: Record<string, string> | null) => void; // Add setter
 }
 
 const ChatAnalysisContext = createContext<ChatAnalysisContextType | undefined>(undefined);
@@ -57,6 +61,8 @@ export const ChatAnalysisProvider: React.FC<ChatAnalysisProviderProps> = ({ chil
   const [lastAiCallTime, setLastAiCallTime] = useState<number>(0);
   const [aiCallCount, setAiCallCount] = useState<number>(0);
   const [generatedSign, setGeneratedSign] = useState<string | null>(null); // Initialize generated sign state
+  const [selectedSender, setSelectedSender] = useState<string | null>(null); // Initialize selected sender state
+  const [aiFlagPersonalityAnalysis, setAiFlagPersonalityAnalysis] = useState<Record<string, string> | null>(null); // Initialize AI flag analysis state
 
   // Function to reset the analysis state
   const resetAnalysis = () => {
@@ -72,6 +78,8 @@ export const ChatAnalysisProvider: React.FC<ChatAnalysisProviderProps> = ({ chil
     setAiPoem(null); // Reset AI Poem
     setAiStyleAnalysis(null);
     setGeneratedSign(null); // Reset generated sign
+    setSelectedSender(null); // Reset selected sender
+    setAiFlagPersonalityAnalysis(null); // Reset AI flag analysis
     setLastAiCallTime(0);
     setAiCallCount(0);
   };
@@ -106,6 +114,10 @@ export const ChatAnalysisProvider: React.FC<ChatAnalysisProviderProps> = ({ chil
     setAiCallCount,
     generatedSign, // Provide generated sign state
     setGeneratedSign, // Provide generated sign setter
+    selectedSender, // Provide selected sender state
+    setSelectedSender, // Provide selected sender setter
+    aiFlagPersonalityAnalysis, // Provide AI flag analysis state
+    setAiFlagPersonalityAnalysis, // Provide AI flag analysis setter
   };
 
   return (

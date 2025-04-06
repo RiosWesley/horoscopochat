@@ -36,6 +36,41 @@ const flirtationPatterns = {
   words: createWordRegex(flirtationWords, 'i'), // Case insensitive
 };
 
+// --- Red/Green Flag Keywords/Patterns ---
+// Using simplified lists for now, can be expanded with the user's detailed list later
+// For performance, using regex might be better than iterating many strings per message.
+// Let's create regex for some key examples provided by the user.
+
+const redFlagWords = [
+  'cala a boca', 'some daqui', 'desaparece', 'não me procure mais', 'culpa é sua', 'você me fez',
+  'você sempre estraga', 'você está exagerando', 'não foi nada demais', 'supere isso', 'muito sensível',
+  'drama desnecessário', 'pare de frescura', 'você não pode', 'me dê sua senha', 'você tem que fazer do meu jeito',
+  'se você me amasse', 'ninguém vai te querer', 'você vai se arrepender', 'isso nunca aconteceu', 'eu nunca disse isso',
+  'você está imaginando', 'você está louco', 'você está louca', 'foi só uma brincadeira', 'você sempre chega atrasado',
+  'você nunca me escuta', 'você me irrita', 'você me cansa', 'tanto faz', // Added from passive-aggressive as it fits here too
+  // Add more specific insults or patterns if needed
+  'burro', 'burra', 'idiota', 'inútil', 'patético', 'patética'
+];
+
+const greenFlagWords = [
+  'conte comigo', 'estou aqui por você', 'como posso te ajudar', 'acredito em você', 'confio no seu potencial',
+  'você consegue', 'estou torcendo', 'não desista', 'respeito sua opinião', 'respeito sua decisão',
+  'entendo seu ponto', 'seus sentimentos são válidos', 'faz sentido você se sentir assim', 'obrigado por compartilhar',
+  'eu te escuto', 'estou prestando atenção', 'obrigado pelo apoio', 'obrigado pela ajuda', 'admiro você',
+  'valorizo muito', 'que bom que você', 'parabéns', 'fico feliz por sua conquista', 'estou orgulhoso', 'estou orgulhosa',
+  'você faz a diferença', 'gosto de passar tempo com você', 'desculpe, eu errei', 'peço desculpas', 'assumo a responsabilidade',
+  'como posso consertar', 'eu não deveria ter', 'aprendi com meu erro', 'podemos conversar sobre isso',
+  'gostaria de entender melhor', 'estou aberto a ouvir', 'estou aberta a ouvir', 'tudo bem se você não quiser',
+  'respeito seu não', 'vou te dar espaço', 'como podemos resolver juntos', 'qual sua sugestão', 'vamos encontrar um meio-termo',
+  'estamos no mesmo time', 'imagino como isso deve ser difícil', 'sinto muito que você esteja passando por isso',
+  'me coloco no seu lugar', 'você me inspira'
+];
+
+const flagPatterns = {
+  redFlags: createWordRegex(redFlagWords, 'i'), // Case insensitive
+  greenFlags: createWordRegex(greenFlagWords, 'i'), // Case insensitive
+};
+
 
 // Regex for finding all-caps words (3+ letters)
 const capsWordRegex = /\b[A-ZÁÉÍÓÚÀÂÊÔÃÕÜÇ]{3,}\b/g;
@@ -89,6 +124,12 @@ export interface SenderStats {
   // Premium per-sender percentages (calculated at the end)
   passiveAggressivePercentage: number | null;
   flirtationPercentage: number | null;
+  // Flag counts
+  redFlagCount: number;
+  greenFlagCount: number;
+  // Store actual matched flag keywords/phrases
+  redFlagKeywords: string[];
+  greenFlagKeywords: string[];
 }
 
 // Define structure for common expressions
@@ -123,6 +164,12 @@ export interface AnalysisResults {
   // Premium fields (Overall Percentages) - Counts removed
   passiveAggressivePercentage: number | null;
   flirtationPercentage: number | null;
+  // Flag counts (overall)
+  totalRedFlags: number;
+  totalGreenFlags: number;
+  // Optional: Store examples of flags found per sender? Could be large.
+  // redFlagExamples: Record<string, string[]>;
+  // greenFlagExamples: Record<string, string[]>;
 }
 
 /**
@@ -149,6 +196,11 @@ const initializeSenderStats = (): SenderStats => {
     flirtationCount: 0,
     passiveAggressivePercentage: null,
     flirtationPercentage: null,
+    // Flags init
+    redFlagCount: 0,
+    greenFlagCount: 0,
+    redFlagKeywords: [],
+    greenFlagKeywords: [],
   };
 };
 
@@ -186,10 +238,16 @@ export const analyzeChat = (messages: ParsedMessage[]): AnalysisResults => {
     // Premium fields init (percentages) - Counts removed
     passiveAggressivePercentage: null,
     flirtationPercentage: null,
+    // Flags init
+    totalRedFlags: 0,
+    totalGreenFlags: 0,
   };
   // Temporary overall counts needed for percentage calculation
   let totalPaCount = 0;
   let totalFlirtCount = 0;
+  let totalRedFlagCount = 0; // Renamed for clarity
+  let totalGreenFlagCount = 0; // Renamed for clarity
+
 
   // Initialize overall keyword counts map
   Object.keys(keywords).forEach(key => {
@@ -344,6 +402,29 @@ export const analyzeChat = (messages: ParsedMessage[]): AnalysisResults => {
     if (senderStats && flirtMatches > 0) {
       senderStats.flirtationCount += flirtMatches; // Increment per-sender count
     }
+
+    // --- Red/Green Flag Counting ---
+    const redFlagMatches = lowerCaseMessage.match(flagPatterns.redFlags);
+    if (redFlagMatches) {
+      const count = redFlagMatches.length;
+      totalRedFlagCount += count;
+      if (senderStats) {
+        senderStats.redFlagCount += count;
+        // Store the matched keywords/phrases (lowercase)
+        senderStats.redFlagKeywords.push(...redFlagMatches.map(match => match.toLowerCase()));
+      }
+    }
+
+    const greenFlagMatches = lowerCaseMessage.match(flagPatterns.greenFlags);
+    if (greenFlagMatches) {
+      const count = greenFlagMatches.length;
+      totalGreenFlagCount += count;
+      if (senderStats) {
+        senderStats.greenFlagCount += count;
+        // Store the matched keywords/phrases (lowercase)
+        senderStats.greenFlagKeywords.push(...greenFlagMatches.map(match => match.toLowerCase()));
+      }
+    }
   });
 
   // --- Final Calculations ---
@@ -352,6 +433,9 @@ export const analyzeChat = (messages: ParsedMessage[]): AnalysisResults => {
     // Calculate overall premium percentages
     results.passiveAggressivePercentage = parseFloat(((totalPaCount / results.totalMessages) * 100).toFixed(1));
     results.flirtationPercentage = parseFloat(((totalFlirtCount / results.totalMessages) * 100).toFixed(1));
+    // Store total flag counts
+    results.totalRedFlags = totalRedFlagCount;
+    results.totalGreenFlags = totalGreenFlagCount;
   }
 
   for (const sender in results.statsPerSender) {

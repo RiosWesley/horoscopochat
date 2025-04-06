@@ -5,10 +5,12 @@ import { getFunctions, httpsCallable } from "firebase/functions";
 import { firebaseApp } from '@/firebaseConfig';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'; // Import Dialog components
-import { Share2, Clock, Award, Star, Gift, MessageSquareText, Users, Laugh, HelpCircle as QuestionIcon, Text, TrendingUp, TrendingDown, UserCircle, Palette, Calendar, Clock1, Smile, Zap, BarChart, PieChart, LineChart, Link as LinkIcon, ClipboardCopy, Loader2, X, BrainCircuit, Sparkles } from 'lucide-react'; // Added X, BrainCircuit, Sparkles icons
+import { Share2, Clock, Award, Star, Gift, MessageSquareText, Users, Laugh, HelpCircle as QuestionIcon, Text, TrendingUp, TrendingDown, UserCircle, Palette, Calendar, Clock1, Smile, Zap, BarChart, PieChart, LineChart, Link as LinkIcon, ClipboardCopy, Loader2, X, BrainCircuit, Sparkles, ThumbsUp, ThumbsDown } from 'lucide-react'; // Added ThumbsUp, ThumbsDown, X, BrainCircuit, Sparkles icons
 import { useChatAnalysis } from '@/context/ChatAnalysisContext';
 import GradientBackground from '@/components/GradientBackground';
 import ResultCard, { ShareButton } from '@/components/ResultCard';
+import { Label } from '@/components/ui/label'; // Added Label
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Added Select components
 import { toast } from 'sonner';
 import FloatingEmoji from '@/components/FloatingEmoji';
 import ContactBubble from '@/components/ContactBubble';
@@ -91,6 +93,10 @@ const ResultsPage = () => {
     aiPoem,
     aiStyleAnalysis,
     generatedSign: contextGeneratedSign,
+    selectedSender, // Added selectedSender
+    setSelectedSender, // Added setSelectedSender
+    isPremium, // Use actual premium status from context
+    // Keep setIsPremiumMock for the toggle button for now
   } = context;
 
   // Determine which results to use: loaded from Firestore or from context
@@ -417,6 +423,11 @@ const ResultsPage = () => {
         aiStyleAnalysis: aiStyleAnalysis,
         generatedSign: calculatedSign, // SAVE the calculated sign
         isPremiumAnalysis: isPremiumMock, // Save the premium status flag
+        // Add flag counts to save data
+        totalRedFlags: contextAnalysisResults.totalRedFlags,
+        totalGreenFlags: contextAnalysisResults.totalGreenFlags,
+        // Add placeholder for the new AI analysis (will be generated in PremiumPage)
+        aiFlagPersonalityAnalysis: null,
     };
 
     try {
@@ -559,6 +570,27 @@ const ResultsPage = () => {
             </div>
           </div>
         </ResultCard>
+
+        {/* --- User Selector --- */}
+        {!analysisId && analysisResults?.messagesPerSender && Object.keys(analysisResults.messagesPerSender).length > 0 && (
+          <div className="mb-6 px-4 py-3 bg-black/10 rounded-lg">
+            <Label htmlFor="user-selector" className="text-sm font-medium mb-2 block opacity-80">Quem é você na conversa?</Label>
+            {/* Use "__none__" for placeholder value and adjust onValueChange */}
+            <Select value={selectedSender ?? "__none__"} onValueChange={(value) => setSelectedSender(value === "__none__" ? null : value)}>
+              <SelectTrigger id="user-selector" className="w-full bg-white/20 border-white/30">
+                <SelectValue placeholder="Selecione seu nome..." />
+              </SelectTrigger>
+              <SelectContent className="bg-gray-800 text-white border-white/30">
+                {/* Changed value from "" to "__none__" */}
+                <SelectItem value="__none__" className="text-gray-400">Ninguém (Visão Geral)</SelectItem>
+                {Object.keys(analysisResults.messagesPerSender).sort().map(sender => (
+                  <SelectItem key={sender} value={sender}>{sender}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedSender && <p className="text-xs opacity-70 mt-2">Análises personalizadas para <span className='font-bold'>{selectedSender}</span> serão destacadas.</p>}
+          </div>
+        )}
 
         {/* Activity Card */}
         {isFullAnalysisResults(analysisResults) && !analysisId && (
@@ -703,6 +735,65 @@ const ResultsPage = () => {
             </div>
           ) : (<p className="text-sm opacity-70 text-center py-4">Não foi possível determinar o balanço de vibrações.</p>)}
         </ResultCard>
+
+        {/* --- Red/Green Flags Card --- */}
+        {/* Show this card only if there are flags OR if it's a shared link (where flags might exist but aren't calculated client-side) */}
+        {/* Show this card only if there are flags OR if it's a shared link (where flags might exist but aren't calculated client-side) */}
+        {/* Safely access flag counts */}
+        {( (analysisResults && 'totalRedFlags' in analysisResults && analysisResults.totalRedFlags > 0) ||
+           (analysisResults && 'totalGreenFlags' in analysisResults && analysisResults.totalGreenFlags > 0) ||
+           analysisId ) && (
+          <ResultCard title="🚩 Balanço de Sinais 💚" variant="secondary">
+            <div className="space-y-4">
+              <p className="text-xs text-center opacity-70">Contagem de frases ou padrões que podem indicar sinais de alerta (Red Flags 🚩) ou sinais positivos (Green Flags 💚) na comunicação. Lembre-se: contexto é tudo!</p>
+
+              {/* Overall Counts - Safe Access */}
+              <div className="flex justify-around text-center">
+                <div>
+                  <p className="text-2xl font-bold text-red-400">{(analysisResults && 'totalRedFlags' in analysisResults ? analysisResults.totalRedFlags : null) ?? 'N/A'}</p>
+                  <p className="text-xs opacity-80">Red Flags 🚩</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-green-400">{(analysisResults && 'totalGreenFlags' in analysisResults ? analysisResults.totalGreenFlags : null) ?? 'N/A'}</p>
+                  <p className="text-xs opacity-80">Green Flags 💚</p>
+                </div>
+              </div>
+
+              {/* Premium Teaser / Per-Sender Breakdown */}
+              {/* Use isPremium from context for non-shared, or loadedResults.isPremiumAnalysis for shared */}
+              {(!analysisId && isPremium) || (analysisId && loadedResults?.isPremiumAnalysis) ? (
+                <>
+                  <Separator className="my-3 bg-white/20" />
+                  <h4 className="text-sm font-medium text-center opacity-90">Detalhes por Participante:</h4>
+                  <div className="space-y-2 text-xs">
+                    {analysisResults.statsPerSender && Object.entries(analysisResults.statsPerSender)
+                      .filter(([, stats]) => (stats?.redFlagCount ?? 0) > 0 || (stats?.greenFlagCount ?? 0) > 0) // Only show senders with flags
+                      .sort(([, statsA], [, statsB]) => (statsB?.messageCount ?? 0) - (statsA?.messageCount ?? 0))
+                      .map(([sender, stats]) => (
+                        <div key={sender} className={`flex justify-between items-center p-1.5 rounded ${sender === selectedSender ? 'bg-white/10 font-semibold' : ''}`}>
+                          <span className="opacity-80">{sender}:</span>
+                          <div className="flex space-x-3">
+                            <span className="text-red-400 flex items-center"><ThumbsDown className="w-3 h-3 mr-1"/> {stats?.redFlagCount ?? 0}</span>
+                            <span className="text-green-400 flex items-center"><ThumbsUp className="w-3 h-3 mr-1"/> {stats?.greenFlagCount ?? 0}</span>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </>
+              ) : !analysisId ? ( // Show teaser only if not shared and not premium
+                <div className="text-center mt-4">
+                  <Separator className="my-3 bg-white/20" />
+                  <p className="text-xs opacity-80 mb-2">Veja a contagem por participante e mais detalhes com o Premium!</p>
+                  {/* Changed button size from xs to sm */}
+                  <Button onClick={handlePremiumClick} size="sm" variant="outline" className="text-xs border-yellow-500/50 text-yellow-300 hover:bg-yellow-500/10 hover:text-yellow-200">
+                    ✨ Ver Vantagens Premium
+                  </Button>
+                </div>
+              ) : null /* Don't show teaser on shared links if not premium */}
+            </div>
+          </ResultCard>
+        )}
+
 
         {/* Expressions Card */}
         <ResultCard title="Suas Expressões Favoritas" variant="primary">

@@ -76,10 +76,13 @@ Create a functional web application that analyzes uploaded WhatsApp chat `.txt` 
     *   [X] Implement "Analisar outro chat" button functionality in `ResultsPage.tsx`.
     *   [X] Add navigation button to Premium Area in `ResultsPage.tsx` when premium is active.
     *   [X] Create dedicated Premium Page (`/premium`).
-    *   [X] Implement AI analysis calls and display on Premium Page.
+    *   [X] Implement AI analysis calls and display on Premium Page (Prediction, Poem, Style).
     *   [X] Implement Passive-Aggressive and Flirtation analysis display (including random compatibility) on Premium Page.
+    *   [X] Implement AI-powered Flag Personality analysis display on Premium Page (replaces simple flag count).
+        *   [X] Fix `TypeError: .trim is not a function` when processing AI flag personality result.
     *   [X] Implement Save/Share functionality (`/results/:analysisId`, Firestore save/load via Cloud Functions, including premium status display on shared links).
         *   [X] Fix Signo display on shared links (save/load `generatedSign`).
+        *   [X] Include Red/Green flag counts in saved data (`functions/src/index.ts`).
 6.  **UI Components & Visualization:**
     *   [X] Create `ContactBubble` component to display sender names and message counts.
     *   [X] Create `SentimentChart` component using Recharts for displaying sentiment analysis.
@@ -96,13 +99,24 @@ Create a functional web application that analyzes uploaded WhatsApp chat `.txt` 
     *   [X] Add tabbed interface for sender details, showing profile, statistics, and emoji usage.
     *   [X] Create `ShareableImage` component for rendering results to an image.
     *   [X] Create `TimelineChart` component for daily/weekly activity visualization.
+    *   [X] Add User Selector dropdown in `ResultsPage.tsx`.
+    *   [X] Add Red/Green Flag analysis section in `ResultsPage.tsx` (with premium breakdown).
 
 ## Next Steps
 
+*   [X] Implement Red/Green Flag analysis (backend logic in `analyzeChat.ts`).
+    *   [X] Add keyword lists and regex patterns for flags.
+    *   [X] Add counting logic per message and per sender.
+    *   [X] Store matched flag keywords per sender in `SenderStats`.
+    *   [X] Update `AnalysisResults` and `SenderStats` interfaces.
+*   [X] Implement AI Task (`analyzeFlagsPersonality`) in Cloud Function (`functions/src/index.ts`).
+    *   [X] Define prompt to analyze personality based on flag keywords per sender.
+    *   [X] Handle JSON response.
+    *   [X] Update `AnalysisResultsToSave` interface.
+*   [X] Deploy Firebase Cloud Functions (`callGemini`, `saveAnalysisResults`, `getAnalysisResults`).
 *   Add animations for transitions between different views and states.
 *   Further refine chat parsing for any remaining edge cases if needed.
 *   Explore ad integration (e.g., AdSense/AdMob) as an additional monetization strategy.
-*   [X] Deploy Firebase Cloud Function (`callGemini`). *(Skipped - No changes detected)*
 *   Implement *actual* premium features and subscription handling (currently mocked).
 *   Securely manage API keys using environment variables/secrets management for production.
 *   Add explicit user consent flow for sending data to AI APIs.
