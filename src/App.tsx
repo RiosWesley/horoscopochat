@@ -11,6 +11,7 @@ import InstructionsPage from "./pages/InstructionsPage";
 import AnalyzingPage from "./pages/AnalyzingPage";
 import ResultsPage from "./pages/ResultsPage";
 import PremiumPage from "./pages/PremiumPage"; // Import the new Premium page
+import PaymentPage from "./pages/PaymentPage"; // Import the new Payment page
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
             {/* Updated route to accept optional analysisId */}
             <Route path="/results/:analysisId?" element={<ResultsPage />} />
             <Route path="/premium" element={<PremiumPage />} /> {/* Add premium route */}
+            <Route path="/payment/:analysisId" element={<PaymentPage />} /> {/* Add payment route */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
