@@ -66,7 +66,9 @@ const stopWords = new Set([
   'vc', 'td', 'tb', 'tbm', 'pra', 'pro', 'pq', 'q', 'né', 'aí', 'la', 'tá', 'to', 'blz', 'vlw', 'flw', 'abs',
   'mim', 'ti', 'si', 'conosco', 'convosco', 'aqui', 'ali', 'lá', 'cá', 'muito', 'pouco', 'sempre', 'nunca',
   'talvez', 'agora', 'hoje', 'ontem', 'amanhã', 'cedo', 'tarde', 'noite', 'dia', 'mês', 'ano', 'hora',
-  'minuto', 'segundo', 'então', 'assim', 'sobre', 'sob', 'ante', 'após', 'desde', 'contra', 'perante', 'trás'
+  'minuto', 'segundo', 'então', 'assim', 'sobre', 'sob', 'ante', 'após', 'desde', 'contra', 'perante', 'trás',
+  // System message related words
+  'localização', 'tempo', 'real', 'compartilhada', 'ligação', 'voz', 'chamada', 'vídeo', 'perdida', 'encerrada', 'atual'
 ]);
 
 // Define structure for per-sender stats
@@ -395,12 +397,13 @@ export const analyzeChat = (messages: ParsedMessage[]): AnalysisResults => {
    const minWordFrequency = 2;
    if (emojiRegex.global) emojiRegex.lastIndex = 0;
    for (const word in results.wordCounts) {
-     emojiRegex.lastIndex = 0;
-     if (results.wordCounts[word] > maxWordCount && results.wordCounts[word] >= minWordFrequency && !emojiRegex.test(word)) {
+     // Check conditions: higher count than current max, meets min frequency
+     // Emoji check is removed here as words should already be filtered during initial processing
+     if (results.wordCounts[word] > maxWordCount && results.wordCounts[word] >= minWordFrequency) {
        maxWordCount = results.wordCounts[word];
        results.favoriteWord = word;
      }
-   }
+   } // <-- Added missing closing brace for the 'for' loop
 
    // Find top N expressions (bigrams)
    const minExpressionFrequency = 3; // Require expression to appear at least 3 times

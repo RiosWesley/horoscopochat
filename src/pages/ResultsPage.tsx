@@ -264,9 +264,10 @@ const ResultsPage = () => {
   }, [analysisId, calculatedSign, setGeneratedSign]);
 
   // Use the sign from the correct source
-  // If analysisId exists, display a generic placeholder as sign is not saved
-  // Otherwise, use the calculatedSign from heuristics
-  const displaySign = analysisId ? "Signo (Compartilhado)" : (calculatedSign ?? "Signo Indefinido");
+  // If analysisId exists and loadedResults has a sign, use it. Otherwise, use the calculatedSign.
+  const displaySign = analysisId
+    ? (loadedResults?.generatedSign ?? "Signo (Compartilhado)") // Use saved sign if available
+    : (calculatedSign ?? "Signo Indefinido"); // Use calculated sign otherwise
 
   // --- Emoji Cloud Data ---
   const emojiCloudData = useMemo(() => {
@@ -414,7 +415,7 @@ const ResultsPage = () => {
         aiPrediction: aiPrediction,
         aiPoem: aiPoem,
         aiStyleAnalysis: aiStyleAnalysis,
-        // generatedSign: contextGeneratedSign, // DO NOT SAVE - Calculated client-side
+        generatedSign: calculatedSign, // SAVE the calculated sign
         isPremiumAnalysis: isPremiumMock, // Save the premium status flag
     };
 
@@ -657,7 +658,48 @@ const ResultsPage = () => {
                 {analysisResults.keywordCounts.positive > 0 && (<div className="h-6 bg-gradient-to-r from-green-400 to-emerald-500 flex items-center justify-center text-xs text-white font-medium" style={{ width: `${(analysisResults.keywordCounts.positive / (analysisResults.keywordCounts.positive + analysisResults.keywordCounts.negative + 0.001)) * 100}%` }} title={`Positivas: ${analysisResults.keywordCounts.positive}`}>Positiva</div>)}
                 {analysisResults.keywordCounts.negative > 0 && (<div className="h-6 bg-gradient-to-r from-red-400 to-rose-500 flex items-center justify-center text-xs text-white font-medium" style={{ width: `${(analysisResults.keywordCounts.negative / (analysisResults.keywordCounts.positive + analysisResults.keywordCounts.negative + 0.001)) * 100}%` }} title={`Negativas: ${analysisResults.keywordCounts.negative}`}>Negativa</div>)}
               </div>
-              <p className="text-xs text-center opacity-70 pt-1">Baseado na contagem de palavras-chave positivas e negativas.</p>
+              <p className="text-xs text-center opacity-70 pt-1">Balanço geral baseado na contagem de palavras-chave.</p>
+
+              {/* Per-Sender Sentiment Breakdown */}
+              <Separator className="my-4 bg-white/20" />
+              <h4 className="text-sm font-medium mb-2 text-center opacity-90">Vibrações por Participante:</h4>
+              <div className="space-y-3">
+                {analysisResults.statsPerSender && Object.entries(analysisResults.statsPerSender)
+                  .sort(([, statsA], [, statsB]) => (statsB?.messageCount ?? 0) - (statsA?.messageCount ?? 0)) // Sort by message count
+                  .map(([sender, stats]) => {
+                    const positiveCount = stats?.keywordCounts?.positive ?? 0;
+                    const negativeCount = stats?.keywordCounts?.negative ?? 0;
+                    const totalSentiment = positiveCount + negativeCount;
+                    const positivePercentage = totalSentiment > 0 ? (positiveCount / totalSentiment) * 100 : 0;
+                    const negativePercentage = totalSentiment > 0 ? (negativeCount / totalSentiment) * 100 : 0;
+
+                    // Only display if there's sentiment data for the sender
+                    if (totalSentiment > 0) {
+                      return (
+                        <div key={sender}>
+                          <p className="text-xs font-medium mb-1 opacity-80">{sender}</p>
+                          <div className="w-full bg-gray-200 rounded-full h-3 flex overflow-hidden">
+                            {positiveCount > 0 && (
+                              <div
+                                className="h-3 bg-gradient-to-r from-green-400 to-emerald-500"
+                                style={{ width: `${positivePercentage}%` }}
+                                title={`Positivas: ${positiveCount}`}
+                              />
+                            )}
+                            {negativeCount > 0 && (
+                              <div
+                                className="h-3 bg-gradient-to-r from-red-400 to-rose-500"
+                                style={{ width: `${negativePercentage}%` }}
+                                title={`Negativas: ${negativeCount}`}
+                              />
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null; // Don't render if no sentiment data
+                  })}
+              </div>
             </div>
           ) : (<p className="text-sm opacity-70 text-center py-4">Não foi possível determinar o balanço de vibrações.</p>)}
         </ResultCard>

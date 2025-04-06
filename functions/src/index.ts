@@ -221,7 +221,7 @@ export interface AnalysisResultsToSave { // Added export
   aiPrediction: string | null;
   aiPoem: string | null;
   aiStyleAnalysis: string | null;
-  // Heuristics - generatedSign is calculated client-side, not saved
+  generatedSign: string | null; // Added field for the calculated sign
   isPremiumAnalysis: boolean; // Flag indicating if the original analysis was premium
   // Add any other relevant aggregated/generated fields
   createdAt: admin.firestore.FieldValue; // Timestamp for saving
@@ -261,7 +261,7 @@ export const saveAnalysisResults = functions.https.onCall(async (data: unknown, 
   if (typeof receivedData.aiPrediction === 'string' || receivedData.aiPrediction === null) dataToSave.aiPrediction = receivedData.aiPrediction;
   if (typeof receivedData.aiPoem === 'string' || receivedData.aiPoem === null) dataToSave.aiPoem = receivedData.aiPoem;
   if (typeof receivedData.aiStyleAnalysis === 'string' || receivedData.aiStyleAnalysis === null) dataToSave.aiStyleAnalysis = receivedData.aiStyleAnalysis;
-  // Do not save generatedSign: if (typeof receivedData.generatedSign === 'string' || receivedData.generatedSign === null) dataToSave.generatedSign = receivedData.generatedSign;
+  if (typeof receivedData.generatedSign === 'string' || receivedData.generatedSign === null) dataToSave.generatedSign = receivedData.generatedSign; // Save the generated sign
   if (typeof receivedData.isPremiumAnalysis === 'boolean') dataToSave.isPremiumAnalysis = receivedData.isPremiumAnalysis; // Save the premium flag
   // --- End mapping ---
 

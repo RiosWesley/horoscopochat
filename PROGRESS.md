@@ -27,11 +27,13 @@ Create a functional web application that analyzes uploaded WhatsApp chat `.txt` 
     *   [X] Implement average message length calculation.
     *   [X] Implement "Palavra Favorita" analysis (most frequent significant word).
     *   [X] Fix "Palavra Favorita" bug related to media placeholders.
+    *   [X] Investigate "Palavra Favorita" returning `null`; confirmed this is expected if no word meets frequency/filtering criteria. (Code cleanup performed).
     *   [X] Implement punctuation emphasis (!!!, ???) and CAPS word analysis.
     *   [X] Implement simple heuristic rules for generating insights (Signo, Pequenas Verdades) in `ResultsPage.tsx`.
     *   [X] Refine heuristics to incorporate punctuation/CAPS data.
     *   [X] Further refine heuristics for more varied/combined insights (Signo combination, talkative person fact).
     *   [X] Implement common expression (bigram) analysis.
+    *   [X] Refine expression analysis by adding system message words to `stopWords` to filter out irrelevant phrases (e.g., "localização tempo").
     *   [X] Implement response time analysis per sender.
 4.  **State Management (React Context):**
     *   [X] Set up `ChatAnalysisContext` to hold raw text, parsed messages, analysis results, and loading state.
@@ -46,7 +48,7 @@ Create a functional web application that analyzes uploaded WhatsApp chat `.txt` 
     *   [X] Update `ResultsPage` to display most frequent emoji and peak hour statistic.
     *   [X] Update `ResultsPage` to display generated Signo and Pequenas Verdades based on heuristics.
     *   [X] Update `ResultsPage` to display average message length and keyword insights.
-    *   [X] Update `ResultsPage` to display "Mix de Vibrações" based on positive/negative keywords.
+    *   [X] Update `ResultsPage` to display "Mix de Vibrações" based on positive/negative keywords (including per-sender breakdown).
     *   [X] Update `ResultsPage` to display "Palavra Favorita".
     *   [X] Update heuristics in `ResultsPage.tsx` to use keyword, avg length, punctuation, and CAPS data.
     *   [X] Add Signo description generation and display.
@@ -77,6 +79,7 @@ Create a functional web application that analyzes uploaded WhatsApp chat `.txt` 
     *   [X] Implement AI analysis calls and display on Premium Page.
     *   [X] Implement Passive-Aggressive and Flirtation analysis display (including random compatibility) on Premium Page.
     *   [X] Implement Save/Share functionality (`/results/:analysisId`, Firestore save/load via Cloud Functions, including premium status display on shared links).
+        *   [X] Fix Signo display on shared links (save/load `generatedSign`).
 6.  **UI Components & Visualization:**
     *   [X] Create `ContactBubble` component to display sender names and message counts.
     *   [X] Create `SentimentChart` component using Recharts for displaying sentiment analysis.
