@@ -10,10 +10,7 @@ import WelcomePage from "./pages/WelcomePage";
 import InstructionsPage from "./pages/InstructionsPage";
 import AnalyzingPage from "./pages/AnalyzingPage";
 import ResultsPage from "./pages/ResultsPage";
-import PremiumPage from "./pages/PremiumPage";
-import PaymentSuccessPage from './pages/PaymentSuccessPage'; // Import Payment Success Page
-import PaymentFailurePage from './pages/PaymentFailurePage'; // Import Payment Failure Page
-import PaymentPendingPage from './pages/PaymentPendingPage'; // Import Payment Pending Page
+import PremiumPage from "./pages/PremiumPage"; // Import the new Premium page
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,11 +29,7 @@ const App = () => (
             <Route path="/analyzing" element={<AnalyzingPage />} />
             {/* Updated route to accept optional analysisId */}
             <Route path="/results/:analysisId?" element={<ResultsPage />} />
-            <Route path="/premium" element={<PremiumPage />} />
-            {/* Payment Status Routes */}
-            <Route path="/payment/success" element={<PaymentSuccessPage />} />
-            <Route path="/payment/failure" element={<PaymentFailurePage />} />
-            <Route path="/payment/pending" element={<PaymentPendingPage />} />
+            <Route path="/premium" element={<PremiumPage />} /> {/* Add premium route */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

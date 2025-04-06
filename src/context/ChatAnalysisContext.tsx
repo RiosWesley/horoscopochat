@@ -38,8 +38,6 @@ interface ChatAnalysisContextType {
   setSelectedSender: (sender: string | null) => void; // Add setter for the selected sender
   aiFlagPersonalityAnalysis: Record<string, string> | null; // Add state for AI flag personality analysis
   setAiFlagPersonalityAnalysis: (analysis: Record<string, string> | null) => void; // Add setter
-  analysisId: string | null; // Add analysis ID state
-  setAnalysisId: (id: string | null) => void; // Add setter for analysis ID
 }
 
 const ChatAnalysisContext = createContext<ChatAnalysisContextType | undefined>(undefined);
@@ -65,7 +63,6 @@ export const ChatAnalysisProvider: React.FC<ChatAnalysisProviderProps> = ({ chil
   const [generatedSign, setGeneratedSign] = useState<string | null>(null); // Initialize generated sign state
   const [selectedSender, setSelectedSender] = useState<string | null>(null); // Initialize selected sender state
   const [aiFlagPersonalityAnalysis, setAiFlagPersonalityAnalysis] = useState<Record<string, string> | null>(null); // Initialize AI flag analysis state
-  const [analysisId, setAnalysisId] = useState<string | null>(null); // State for analysis ID
 
   // Function to reset the analysis state
   const resetAnalysis = () => {
@@ -83,7 +80,6 @@ export const ChatAnalysisProvider: React.FC<ChatAnalysisProviderProps> = ({ chil
     setGeneratedSign(null); // Reset generated sign
     setSelectedSender(null); // Reset selected sender
     setAiFlagPersonalityAnalysis(null); // Reset AI flag analysis
-    setAnalysisId(null); // Reset analysis ID
     setLastAiCallTime(0);
     setAiCallCount(0);
   };
@@ -122,8 +118,6 @@ export const ChatAnalysisProvider: React.FC<ChatAnalysisProviderProps> = ({ chil
     setSelectedSender, // Provide selected sender setter
     aiFlagPersonalityAnalysis, // Provide AI flag analysis state
     setAiFlagPersonalityAnalysis, // Provide AI flag analysis setter
-    analysisId, // Provide analysis ID
-    setAnalysisId, // Provide setter for analysis ID
   };
 
   return (

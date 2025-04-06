@@ -15,25 +15,15 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 }) : function(o, v) {
     o["default"] = v;
 });
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.handleMercadoPagoNotification = exports.getAnalysisResults = exports.saveAnalysisResults = exports.createMercadoPagoCheckout = exports.callGemini = void 0;
+exports.getAnalysisResults = exports.saveAnalysisResults = exports.callGemini = void 0;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const generative_ai_1 = require("@google/generative-ai");
@@ -247,79 +237,6 @@ exports.callGemini = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError("internal", `Falha ao processar a solicitação de IA: ${errorMessage}`);
     }
 }); // End of callGemini function
-// --- Function to Create Mercado Pago Checkout Preference ---
-const mercadopago_1 = require("mercadopago");
-exports.createMercadoPagoCheckout = functions.https.onCall(async (data, context) => {
-    functions.logger.info("createMercadoPagoCheckout function started.");
-    const requestData = data?.data || data;
-    // Validate payload
-    if (!requestData || typeof requestData !== 'object') {
-        functions.logger.error("Invalid request data: not an object.", { requestData });
-        throw new functions.https.HttpsError("invalid-argument", "Invalid request structure.");
-    }
-    const { analysisId, title, unitPrice, successUrl, failureUrl, pendingUrl } = requestData;
-    if (!analysisId || !title || typeof unitPrice !== 'number' || unitPrice <= 0 || !successUrl || !failureUrl || !pendingUrl) {
-        functions.logger.error("Missing or invalid parameters in payload.", { requestData });
-        throw new functions.https.HttpsError("invalid-argument", "Missing or invalid parameters: analysisId, title, unitPrice, successUrl, failureUrl, pendingUrl are required.");
-    }
-    // Retrieve Mercado Pago Access Token from config
-    // IMPORTANT: Use sandbox token for testing, production token for live
-    const accessToken = functions.config().mercadopago?.sandbox_access_token; // Use sandbox for now
-    // const accessToken = functions.config().mercadopago?.access_token; // Use this for production
-    if (!accessToken) {
-        functions.logger.error("Mercado Pago Access Token not found in Firebase Functions config (mercadopago.sandbox_access_token).");
-        throw new functions.https.HttpsError("internal", "Configuration error: Missing Mercado Pago Access Token on the server.");
-    }
-    try {
-        // Initialize Mercado Pago client
-        const client = new mercadopago_1.MercadoPagoConfig({ accessToken: accessToken, options: { timeout: 5000 } });
-        const preference = new mercadopago_1.Preference(client);
-        functions.logger.info(`Creating preference for analysisId: ${analysisId}`);
-        const preferenceData = await preference.create({
-            body: {
-                items: [
-                    {
-                        id: analysisId, // Use analysisId as item ID
-                        title: title, // e.g., "Desbloqueio Premium - Análise de Chat"
-                        quantity: 1,
-                        unit_price: unitPrice, // Price in BRL (e.g., 5.00 for R$ 5,00)
-                        currency_id: "BRL", // Assuming Brazilian Real
-                        description: `Acesso premium para análise ${analysisId}`,
-                    },
-                ],
-                back_urls: {
-                    success: successUrl, // e.g., https://your-app.com/payment/success?analysisId={analysisId}
-                    failure: failureUrl, // e.g., https://your-app.com/payment/failure?analysisId={analysisId}
-                    pending: pendingUrl, // e.g., https://your-app.com/payment/pending?analysisId={analysisId}
-                },
-                auto_return: "approved", // Automatically return to success URL on approval
-                // Pass analysisId in external_reference for webhook identification
-                external_reference: analysisId,
-                notification_url: `https://<YOUR_REGION>-<YOUR_PROJECT_ID>.cloudfunctions.net/handleMercadoPagoNotification`, // REPLACE WITH YOUR ACTUAL WEBHOOK URL LATER
-                // You might want to add payment method exclusions if needed
-                // payment_methods: {
-                //   excluded_payment_types: [ { id: "ticket" } ] // Example: exclude boleto
-                // }
-            },
-        });
-        functions.logger.info(`Preference created successfully for analysisId: ${analysisId}`, { preferenceId: preferenceData.id });
-        // Return the checkout URL (init_point for sandbox or live)
-        const checkoutUrl = preferenceData.sandbox_init_point || preferenceData.init_point;
-        if (!checkoutUrl) {
-            functions.logger.error("Mercado Pago did not return an init_point (checkout URL).", { preferenceData });
-            throw new Error("Failed to get checkout URL from Mercado Pago.");
-        }
-        return { success: true, checkoutUrl: checkoutUrl };
-    }
-    catch (error) {
-        functions.logger.error(`Error creating Mercado Pago preference for analysisId ${analysisId}:`, error?.cause || error);
-        const errorMessage = error instanceof Error ? error.message : "Erro desconhecido ao criar preferência de pagamento.";
-        // Check for specific Mercado Pago errors if possible
-        const statusCode = error?.statusCode || 500;
-        const mpErrorMessage = error?.cause?.[0]?.description || errorMessage;
-        throw new functions.https.HttpsError(statusCode === 400 ? "invalid-argument" : "internal", `Falha ao criar checkout (${statusCode}): ${mpErrorMessage}`);
-    }
-});
 exports.saveAnalysisResults = functions.https.onCall(async (data, context) => {
     functions.logger.info("saveAnalysisResults function started.");
     const receivedData = data?.data || data;
@@ -438,71 +355,6 @@ exports.getAnalysisResults = functions.https.onCall(async (data, context) => {
         functions.logger.error(`Error fetching analysis ${analysisId} from Firestore:`, error);
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
         throw new functions.https.HttpsError("internal", `Failed to retrieve analysis results: ${errorMessage}`);
-    }
-});
-// --- Webhook Handler for Mercado Pago Notifications ---
-const mercadopago_2 = require("mercadopago"); // Import Payment type
-exports.handleMercadoPagoNotification = functions.https.onRequest(async (request, response) => {
-    functions.logger.info("handleMercadoPagoNotification received request:", { method: request.method, query: request.query, body: request.body });
-    // Respond quickly to Mercado Pago to avoid timeouts, especially for initial verification pings
-    if (request.method !== "POST") {
-        functions.logger.warn("Received non-POST request.");
-        response.status(405).send("Method Not Allowed");
-        return;
-    }
-    // Extract notification details from query parameters (for payment notifications)
-    const topic = request.query.topic || request.body.topic;
-    const paymentId = request.query.id || request.body.data?.id;
-    if (topic === "payment" && paymentId) {
-        functions.logger.info(`Processing payment notification for ID: ${paymentId}`);
-        try {
-            // Retrieve Mercado Pago Access Token from config
-            const accessToken = functions.config().mercadopago?.sandbox_access_token; // Use sandbox for now
-            if (!accessToken) {
-                functions.logger.error("Mercado Pago Access Token not found for webhook processing.");
-                // Respond 500 but don't throw, as MP might retry
-                response.status(500).send("Internal Server Error: Missing MP config.");
-                return;
-            }
-            // Initialize Mercado Pago client
-            const client = new mercadopago_1.MercadoPagoConfig({ accessToken: accessToken, options: { timeout: 5000 } });
-            const payment = new mercadopago_2.Payment(client);
-            // Fetch payment details from Mercado Pago
-            const paymentInfo = await payment.get({ id: String(paymentId) });
-            functions.logger.info(`Fetched payment info for ID ${paymentId}:`, { status: paymentInfo.status, external_reference: paymentInfo.external_reference });
-            // Check if payment is approved and has the external reference (analysisId)
-            if (paymentInfo.status === "approved" && paymentInfo.external_reference) {
-                const analysisId = paymentInfo.external_reference;
-                functions.logger.info(`Payment approved for analysisId: ${analysisId}. Updating Firestore.`);
-                const db = admin.firestore();
-                const analysisRef = db.collection("sharedAnalyses").doc(analysisId);
-                // Update the document to mark as premium
-                await analysisRef.update({
-                    isPremiumAnalysis: true,
-                    paymentStatus: "approved", // Optionally store status
-                    paymentId: paymentId, // Optionally store payment ID
-                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                });
-                functions.logger.info(`Successfully updated analysis ${analysisId} to premium.`);
-                // Respond 200 OK to Mercado Pago
-                response.status(200).send("OK");
-            }
-            else {
-                functions.logger.warn(`Payment status not 'approved' or missing external_reference for payment ID ${paymentId}. Status: ${paymentInfo.status}`);
-                // Respond 200 OK even if not approved, to acknowledge receipt
-                response.status(200).send("Notification received, but payment not processed for premium update.");
-            }
-        }
-        catch (error) {
-            functions.logger.error(`Error processing Mercado Pago notification for payment ID ${paymentId}:`, error);
-            // Respond 500 to indicate an error processing
-            response.status(500).send("Error processing notification.");
-        }
-    }
-    else {
-        functions.logger.info("Received notification is not a payment topic or missing ID. Ignoring.");
-        // Respond 200 OK to acknowledge other notification types or invalid ones
-        response.status(200).send("Notification received but not processed.");
     }
 });
 //# sourceMappingURL=index.js.map
