@@ -27,10 +27,11 @@ import type { ParsedMessage } from '../lib/parseChat';
 // Import the exported type from functions - Adjust path if build process changes it
 import type { AnalysisResultsToSave } from '../../functions/src/index';
 
-// Initialize Firebase Functions for saving/loading
+// Initialize Firebase Functions
 const functions = getFunctions(firebaseApp);
 const saveAnalysisFunction = httpsCallable(functions, 'saveAnalysisResults');
 const getAnalysisFunction = httpsCallable(functions, 'getAnalysisResults');
+const createMercadoPagoCheckoutFunction = httpsCallable(functions, 'createMercadoPagoCheckout'); // Add reference
 
 
 // --- Helper Functions ---
@@ -77,6 +78,7 @@ const ResultsPage = () => {
   const [loadedResults, setLoadedResults] = useState<AnalysisResultsToSave | null>(null); // Use imported type
   const [isLoadingShared, setIsLoadingShared] = useState(!!analysisId);
   const [errorLoadingShared, setErrorLoadingShared] = useState<string | null>(null);
+  const [isCreatingCheckout, setIsCreatingCheckout] = useState(false); // State for checkout loading
 
   const context = useChatAnalysis();
   const {
@@ -97,6 +99,7 @@ const ResultsPage = () => {
     selectedSender, // Added selectedSender
     setSelectedSender, // Added setSelectedSender
     isPremium, // Use actual premium status from context
+    analysisId: contextAnalysisId, // Get analysisId from context
     // Keep setIsPremiumMock for the toggle button for now
   } = context;
 
@@ -139,8 +142,9 @@ const ResultsPage = () => {
     } else {
       // Clear loaded state if navigating away from a shared link view
       setLoadedResults(null);
-      setSharedLinkId(null);
-      setSharedLink(null);
+      // Keep existing sharedLinkId and sharedLink if they were generated in this session
+      // setSharedLinkId(null);
+      // setSharedLink(null);
       setIsLoadingShared(false);
       setErrorLoadingShared(null);
     }
@@ -353,7 +357,53 @@ const ResultsPage = () => {
 
   const handlePremiumClick = () => setShowPremium(true);
   const handleBackToResults = () => setShowPremium(false);
-  const handleSubscribe = () => { toast.success('Obrigado por se interessar! Em um app real, isto processaria sua assinatura.'); setTimeout(() => setShowPremium(false), 1500); };
+
+  // --- Function to handle the actual payment initiation ---
+  const handleSubscribe = async () => {
+    // 1. Check if analysis is saved (we need the ID)
+    // Use sharedLinkId which holds the ID whether it was just saved or loaded from URL
+    if (!sharedLinkId) {
+      toast.error("Por favor, salve a análise primeiro (clique em 'Salvar e Gerar Link') antes de desbloquear o premium.");
+      return;
+    }
+
+    setIsCreatingCheckout(true);
+    toast.info("Preparando checkout seguro com Mercado Pago...");
+
+    try {
+      // 2. Define URLs for redirection after payment
+      const baseUrl = window.location.origin;
+      const successUrl = `${baseUrl}/payment/success?analysisId=${sharedLinkId}`;
+      const failureUrl = `${baseUrl}/payment/failure?analysisId=${sharedLinkId}`;
+      const pendingUrl = `${baseUrl}/payment/pending?analysisId=${sharedLinkId}`;
+
+      // 3. Call the Cloud Function to create preference
+      const result = await createMercadoPagoCheckoutFunction({
+        analysisId: sharedLinkId,
+        title: "Desbloqueio Premium - Horóscopo das Mensagens",
+        unitPrice: 5.00, // R$ 5.00 - Adjust if needed
+        successUrl: successUrl,
+        failureUrl: failureUrl,
+        pendingUrl: pendingUrl,
+      });
+
+      const checkoutData = result.data as { success: boolean; checkoutUrl?: string; message?: string };
+
+      if (checkoutData.success && checkoutData.checkoutUrl) {
+        // 4. Redirect user to Mercado Pago checkout
+        toast.success("Redirecionando para o pagamento...");
+        window.location.href = checkoutData.checkoutUrl;
+        // No need to set isCreatingCheckout to false here, as we are navigating away
+      } else {
+        throw new Error(checkoutData.message || "Não foi possível obter o link de checkout.");
+      }
+    } catch (error: any) {
+      console.error("Erro ao criar checkout Mercado Pago:", error);
+      toast.error(`Falha ao iniciar pagamento: ${error.message || 'Erro desconhecido.'}`);
+      setIsCreatingCheckout(false); // Reset loading state on error
+    }
+    // No finally block needed if navigating away on success
+  };
 
   const handleSenderClick = (sender: string) => {
     if (!analysisId) {
@@ -362,29 +412,30 @@ const ResultsPage = () => {
     }
   };
 
-  // --- Function to Save Analysis and Generate Link ---
+  // --- Function to Save Analysis and Generate Link (Modified) ---
   const handleSaveAndShare = async () => {
     // Use context results for saving, ensure they exist
-    if (!contextAnalysisResults) { // Removed check for contextGeneratedSign as it's not saved
+    if (!contextAnalysisResults) {
        toast.error("A análise original não está disponível para salvar.");
        return;
     }
-    if (sharedLinkId) {
-       toast.info("O link já foi gerado para esta análise.");
+    // Use contextAnalysisId if available, otherwise use the one from params (if viewing shared)
+    const currentAnalysisId = contextAnalysisId || analysisId;
+    if (currentAnalysisId) {
+       // If an ID already exists (either from context or URL), just copy the link
+       handleCopyShareLink();
        return;
     }
 
     setIsSaving(true);
-    toast.info("Salvando análise e gerando link...");
+    toast.info("Salvando análise...");
 
-    // Prepare data payload - select ONLY non-sensitive fields from context results
-    // Ensure the fields match the AnalysisResultsToSave interface
+    // Prepare data payload
     const dataToSave: Omit<AnalysisResultsToSave, 'createdAt'> = {
         totalMessages: contextAnalysisResults.totalMessages,
         messagesPerSender: contextAnalysisResults.messagesPerSender,
         emojiCounts: contextAnalysisResults.emojiCounts,
         mostFrequentEmoji: contextAnalysisResults.mostFrequentEmoji,
-        // Explicitly map required keyword counts
         keywordCounts: {
             laughter: contextAnalysisResults.keywordCounts['laughter'] ?? 0,
             questions: contextAnalysisResults.keywordCounts['questions'] ?? 0,
@@ -396,15 +447,12 @@ const ResultsPage = () => {
         punctuationEmphasisCount: contextAnalysisResults.punctuationEmphasisCount,
         capsWordCount: contextAnalysisResults.capsWordCount,
         topExpressions: contextAnalysisResults.topExpressions,
-        // Ensure statsPerSender matches the expected structure
         statsPerSender: Object.entries(contextAnalysisResults.statsPerSender).reduce((acc, [sender, stats]) => {
-            // Explicitly pick fields and map keywordCounts for each sender
-            // Use the specific type from AnalysisResultsToSave['statsPerSender'][string]
             const senderData: AnalysisResultsToSave['statsPerSender'][string] = {
                 messageCount: stats.messageCount,
                 averageLength: stats.averageLength,
                 emojiCounts: stats.emojiCounts,
-                keywordCounts: { // Explicitly map required keyword counts
+                keywordCounts: {
                     laughter: stats.keywordCounts['laughter'] ?? 0,
                     questions: stats.keywordCounts['questions'] ?? 0,
                     positive: stats.keywordCounts['positive'] ?? 0,
@@ -412,22 +460,19 @@ const ResultsPage = () => {
                 },
                 passiveAggressivePercentage: stats.passiveAggressivePercentage,
                 flirtationPercentage: stats.flirtationPercentage,
-                // averageResponseTimeMinutes: stats.averageResponseTimeMinutes, // Uncomment if saving this
             };
             acc[sender] = senderData;
             return acc;
-        }, {} as AnalysisResultsToSave['statsPerSender']), // Use the specific type from AnalysisResultsToSave
+        }, {} as AnalysisResultsToSave['statsPerSender']),
         passiveAggressivePercentage: contextAnalysisResults.passiveAggressivePercentage,
         flirtationPercentage: contextAnalysisResults.flirtationPercentage,
         aiPrediction: aiPrediction,
         aiPoem: aiPoem,
         aiStyleAnalysis: aiStyleAnalysis,
-        generatedSign: calculatedSign, // SAVE the calculated sign
-        isPremiumAnalysis: isPremiumMock, // Save the premium status flag
-        // Add flag counts to save data
+        generatedSign: calculatedSign,
+        isPremiumAnalysis: isPremiumMock,
         totalRedFlags: contextAnalysisResults.totalRedFlags,
         totalGreenFlags: contextAnalysisResults.totalGreenFlags,
-        // Add placeholder for the new AI analysis (will be generated in PremiumPage)
         aiFlagPersonalityAnalysis: null,
     };
 
@@ -437,11 +482,11 @@ const ResultsPage = () => {
 
         if (saveData.success && saveData.analysisId) {
             const newId = saveData.analysisId;
-            setSharedLinkId(newId);
+            setSharedLinkId(newId); // Set the ID for potential premium unlock
             const newUrl = `${window.location.origin}/results/${newId}`;
-            setSharedLink(newUrl);
-            navigate(`/results/${newId}`, { replace: true });
-            toast.success("Análise salva! Link de compartilhamento gerado.");
+            setSharedLink(newUrl); // Set the link to be displayed
+            // navigate(`/results/${newId}`, { replace: true }); // REMOVED NAVIGATION
+            toast.success("Análise salva! Link de compartilhamento gerado abaixo.");
         } else {
             throw new Error(saveData.message || "Falha ao salvar análise.");
         }
@@ -453,6 +498,30 @@ const ResultsPage = () => {
     } finally {
         setIsSaving(false);
     }
+  };
+
+  // --- Function to Copy Share Link ---
+  const handleCopyShareLink = () => {
+    // Use the analysisId from context (generated after analysis)
+    // If viewing a shared link already, use the analysisId from params
+    const currentAnalysisId = analysisId || contextAnalysisId;
+
+    if (!currentAnalysisId) {
+      toast.error("ID da análise não encontrado. A criação inicial pode ter falhado.");
+      return;
+    }
+
+    const urlToCopy = `${window.location.origin}/results/${currentAnalysisId}`;
+    navigator.clipboard.writeText(urlToCopy)
+      .then(() => {
+        setSharedLink(urlToCopy); // Update state to show the copied link
+        setSharedLinkId(currentAnalysisId); // Ensure sharedLinkId state matches context/param ID
+        toast.success("Link de compartilhamento copiado!");
+      })
+      .catch(err => {
+        console.error("Erro ao copiar link:", err);
+        toast.error("Falha ao copiar o link.");
+      });
   };
 
 
@@ -971,10 +1040,12 @@ const ResultsPage = () => {
         {/* Save/Share Button & Link Display */}
         {!analysisId && ( // Only show save button if not viewing a shared link
           <div className="my-4 flex flex-col items-center space-y-2">
-             <Button onClick={handleSaveAndShare} disabled={isSaving || !!sharedLinkId} variant="outline" size="sm">
+             {/* Modified Button: Now uses handleSaveAndShare which might just display the link */}
+             <Button onClick={handleSaveAndShare} disabled={isSaving} variant="outline" size="sm">
                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LinkIcon className="mr-2 h-4 w-4" />}
                {sharedLinkId ? 'Link Gerado!' : 'Salvar e Gerar Link'}
              </Button>
+             {/* Display the link if it exists in state */}
              {sharedLink && (
                <div className="flex items-center space-x-2 p-2 bg-black/20 rounded-md text-xs w-full max-w-md">
                  <input
@@ -1037,6 +1108,8 @@ const ResultsPage = () => {
            <Button variant="outline" size="sm" className="border-white/30 bg-white/10 text-sm">Ver Tutorial</Button>
         </div>
         {/* Share Button (Always show?) */}
+         {/* Action buttons are not cards, keep outside stagger */}
+         {/* ... other buttons ... */}
         <ShareButton onClick={handleShare} />
       </motion.div> {/* End of container motion.div */}
 
@@ -1071,6 +1144,10 @@ const ResultsPage = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-3 text-sm">
+            {/* Explain the need to save first if not viewing a shared link and it hasn't been saved */}
+            {!analysisId && !sharedLinkId && (
+              <p className="text-xs text-yellow-300 bg-black/20 p-2 rounded-md">💡 Salve a análise primeiro (botão 'Salvar e Gerar Link') para poder desbloqueá-la.</p>
+            )}
             <p><Star className="inline w-4 h-4 mr-1 text-yellow-400" /> Análise de Flerte e Passivo-Agressividade.</p>
             <p><BrainCircuit className="inline w-4 h-4 mr-1 text-green-400" /> Insights gerados por IA (Previsão, Poema, Estilo).</p>
             <p><Award className="inline w-4 h-4 mr-1 text-blue-400" /> Métricas detalhadas por participante.</p>
@@ -1083,8 +1160,14 @@ const ResultsPage = () => {
              {/* <p className="text-lg font-bold mt-1">R$ 29,90 <span className="text-xs font-normal opacity-80">/ mês (ilimitado)</span></p> */}
           </div>
           <DialogFooter className="mt-6 sm:justify-center">
-            <Button onClick={handleSubscribe} className="w-full sm:w-auto bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white font-bold shadow-lg">
-              Desbloquear Análise (R$ 5,00)
+            {/* Disable button if checkout is loading OR if viewing original results and it hasn't been saved yet */}
+            <Button
+              onClick={handleSubscribe}
+              disabled={isCreatingCheckout || (!analysisId && !sharedLinkId)}
+              className="w-full sm:w-auto bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isCreatingCheckout ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {isCreatingCheckout ? 'Processando...' : 'Desbloquear Análise (R$ 5,00)'}
             </Button>
           </DialogFooter>
            <Button variant="ghost" size="icon" className="absolute top-4 right-4 text-purple-200 hover:text-white" onClick={() => setShowPremium(false)}>

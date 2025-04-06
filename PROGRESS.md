@@ -119,8 +119,14 @@ Create a functional web application that analyzes uploaded WhatsApp chat `.txt` 
 *   [ ] Add animations for transitions between different views and states. (Card animation done, others pending)
 *   Further refine chat parsing for any remaining edge cases if needed.
 *   Explore ad integration (e.g., AdSense/AdMob) as an additional monetization strategy.
-*   Implement *actual* premium features and subscription handling (currently mocked).
-*   [X] Securely manage API keys using environment variables/secrets management for production (`.env` for Firebase frontend, `functions:config` for Gemini backend).
+*   [X] Implement *actual* premium features (pay-per-analysis unlock via Mercado Pago).
+    *   [X] Add Cloud Function to create initial analysis record and return ID (`createInitialAnalysisRecord`).
+    *   [X] Call `createInitialAnalysisRecord` after analysis and store ID in context (`AnalyzingPage.tsx`, `ChatAnalysisContext.tsx`).
+    *   [X] Add Cloud Functions for Mercado Pago checkout creation and webhook handling (`createMercadoPagoCheckout`, `handleMercadoPagoNotification`).
+    *   [X] Update "Copy Link" button to use context ID (`ResultsPage.tsx`).
+    *   [X] Integrate checkout call using context ID into frontend (`ResultsPage.tsx`).
+    *   [X] Add payment status pages and routes (`PaymentSuccessPage`, `PaymentFailurePage`, `PaymentPendingPage`, `App.tsx`).
+*   [X] Securely manage API keys using environment variables/secrets management for production (`.env` for Firebase frontend, `functions:config` for Gemini/Mercado Pago backend).
 *   [X] Add explicit user consent flow (checkbox) for sending data to AI APIs on Premium Page (`PremiumPage.tsx`).
 *   Add tutorial/onboarding overlays to guide users through the application.
 

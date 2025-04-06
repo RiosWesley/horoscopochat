@@ -8,19 +8,26 @@ import GradientBackground from '@/components/GradientBackground';
 import AnimatedText from '@/components/AnimatedText';
 import CrystalBall from '@/components/CrystalBall';
 import { FloatingEmojiGroup } from '@/components/FloatingEmoji';
-import { toast } from 'sonner'; // Import toast for error messages
+import { toast } from 'sonner';
+import { getFunctions, httpsCallable } from "firebase/functions"; // Import Firebase functions
+import { firebaseApp } from '@/firebaseConfig'; // Import Firebase app instance
+
+// Initialize Firebase Functions
+const functions = getFunctions(firebaseApp);
+const createInitialAnalysisRecordFunction = httpsCallable(functions, 'createInitialAnalysisRecord');
 
 const AnalyzingPage = () => {
   const navigate = useNavigate();
   const {
     rawChatText,
     setParsedMessages,
-    setAnalysisResults, // Add setter for analysis results
+    setAnalysisResults,
     setIsLoading,
     setError,
-    isLoading, // Get loading state from context
+    isLoading,
+    setAnalysisId, // Get setAnalysisId from context
   } = useChatAnalysis();
-  const [currentLoadingText, setCurrentLoadingText] = useState(''); // State for dynamic text
+  const [currentLoadingText, setCurrentLoadingText] = useState('');
 
   // Sample funny loading texts
   const loadingTexts = [
@@ -41,16 +48,17 @@ const AnalyzingPage = () => {
       // If there's no chat text, something went wrong (e.g., user navigated directly)
       toast.error("Nenhum arquivo de chat encontrado para analisar.");
       navigate('/instructions'); // Redirect back to instructions
-      return;
-    }
+       return;
+     }
 
-    // Start loading/parsing process
-    setIsLoading(true); 
-    setError(null);
+     const processChat = async () => {
+       setIsLoading(true);
+       setError(null);
+       setAnalysisId(null); // Reset previous ID if any
 
-    try {
-      console.log("AnalyzingPage: Starting chat parsing...");
-      setCurrentLoadingText("Lendo o arquivo..."); // Update loading text
+       try {
+         console.log("AnalyzingPage: Starting chat parsing...");
+         setCurrentLoadingText("Lendo o arquivo...");
       const parsed = parseChat(rawChatText);
       console.log(`AnalyzingPage: Parsing complete. ${parsed.length} messages found.`);
       setParsedMessages(parsed); // Store parsed messages
@@ -59,18 +67,35 @@ const AnalyzingPage = () => {
       setCurrentLoadingText("Analisando as mensagens..."); // Update loading text
       console.log("AnalyzingPage: Starting analysis...");
       const results = analyzeChat(parsed); // Call the analysis function
-      console.log("AnalyzingPage: Analysis complete.");
-      setAnalysisResults(results); // Store analysis results in context
+       console.log("AnalyzingPage: Analysis complete.");
+       setAnalysisResults(results);
 
-      // Simulate a short delay for the animation before navigating
-      setCurrentLoadingText("Quase lá..."); // Final loading text
-      const navigationTimer = setTimeout(() => {
-        setIsLoading(false);
-        toast.success('Análise concluída! ✨');
-        navigate('/results');
-      }, 1000); // Shorter delay after analysis
+       // --- Create initial Firestore record ---
+       let createdAnalysisId: string | null = null;
+       try {
+         setCurrentLoadingText("Criando registro...");
+         console.log("AnalyzingPage: Calling createInitialAnalysisRecordFunction...");
+         const initialRecordResult = await createInitialAnalysisRecordFunction();
+         const recordData = initialRecordResult.data as { success: boolean; analysisId?: string; message?: string };
+         if (recordData.success && recordData.analysisId) {
+           createdAnalysisId = recordData.analysisId;
+           setAnalysisId(createdAnalysisId); // Save the ID to context
+           console.log(`AnalyzingPage: Initial record created with ID: ${createdAnalysisId}`);
+           toast.success("Registro inicial criado!");
+         } else {
+           throw new Error(recordData.message || "Falha ao criar registro inicial no servidor.");
+         }
+       } catch (recordError: any) {
+         console.error("AnalyzingPage: Erro ao criar registro inicial:", recordError);
+         toast.error(`Erro ao preparar para compartilhamento/premium: ${recordError.message}. Funcionalidades podem ser limitadas.`);
+         setAnalysisId(null); // Ensure ID is null on error
+       }
+       // --- End Firestore record creation ---
 
-      return () => clearTimeout(navigationTimer);
+       setCurrentLoadingText("Quase lá...");
+       setIsLoading(false);
+       toast.success('Análise concluída! ✨');
+       navigate('/results'); // Navigate to results page (without ID in URL)
 
     } catch (err) {
       console.error("AnalyzingPage: Error during processing:", err);
@@ -78,12 +103,18 @@ const AnalyzingPage = () => {
       setError(`Erro ao processar o chat: ${errorMessage}`);
       setIsLoading(false);
       toast.error(`Erro no processamento: ${errorMessage}`);
-      navigate('/instructions'); // Redirect back on error
-    }
+       navigate('/instructions');
+     }
+    };
 
-  }, [rawChatText, navigate, setParsedMessages, setAnalysisResults, setIsLoading, setError]); // Add setAnalysisResults to dependency array
+    processChat(); // Execute the async function
 
-  // Render loading state
+    // No cleanup needed here as navigation happens within processChat
+    // The setTimeout was removed
+
+   }, [rawChatText, navigate, setParsedMessages, setAnalysisResults, setIsLoading, setError, setAnalysisId]); // Add setAnalysisId
+
+   // Render loading state
   return (
     <GradientBackground variant="cool">
       <FloatingEmojiGroup />
