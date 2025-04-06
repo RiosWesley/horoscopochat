@@ -1,8 +1,11 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { Badge } from "@/components/ui/badge"; // Import Badge
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { Checkbox } from "@/components/ui/checkbox"; // Import Checkbox
+import { Label } from "@/components/ui/label"; // Import Label
 import { ArrowLeft, BrainCircuit, Feather, Sparkles, Loader2, Users, Smile, HeartCrack, Percent, ThumbsUp, ThumbsDown, UserCheck } from 'lucide-react'; // Added UserCheck
 import { useChatAnalysis } from '@/context/ChatAnalysisContext';
 import { getFunctions, httpsCallable } from "firebase/functions";
@@ -14,9 +17,11 @@ import type { ParsedMessage } from '../lib/parseChat'; // Import ParsedMessage t
 const functions = getFunctions(firebaseApp);
 const callGeminiFunction = httpsCallable(functions, 'callGemini');
 
-// Constants for rate limiting
-const AI_CALL_LIMIT = 3; // Max calls
-const AI_CALL_WINDOW = 5 * 60 * 1000; // 5 minutes in milliseconds
+// Constants for rate limiting (per feature)
+const MIN_INTERVAL_MS = 30 * 1000; // 30 seconds minimum interval between calls for the SAME feature
+
+// Type for AI feature keys
+type AiFeatureType = 'prediction' | 'poem' | 'style' | 'flagPersonality';
 
 // Helper to anonymize messages
 const anonymizeMessages = (messages: ParsedMessage[]): string => {
@@ -104,10 +109,7 @@ const PremiumPage: React.FC = () => {
     setAiPoem,
     aiStyleAnalysis,
     setAiStyleAnalysis,
-    lastAiCallTime,
-    setLastAiCallTime,
-    aiCallCount,
-    setAiCallCount,
+    // Removed global rate limit state from context
     analysisResults,
     generatedSign,
     selectedSender, // Get selected sender to highlight
@@ -119,24 +121,40 @@ const PremiumPage: React.FC = () => {
   const [isPoemLoading, setIsPoemLoading] = useState(false);
   const [isStyleLoading, setIsStyleLoading] = useState(false);
   const [isFlagPersonalityLoading, setIsFlagPersonalityLoading] = useState(false); // Add loading state for flag personality
+  const [aiConsentGiven, setAiConsentGiven] = useState(false); // State for AI consent
 
-  const callAIFeature = useCallback(async (featureType: 'prediction' | 'poem' | 'style' | 'flagPersonality') => {
+  // State to track last call timestamp for each feature
+  const [lastCallTimestamps, setLastCallTimestamps] = useState<Record<AiFeatureType, number>>({
+    prediction: 0,
+    poem: 0,
+    style: 0,
+    flagPersonality: 0,
+  });
+
+  const callAIFeature = useCallback(async (featureType: AiFeatureType) => {
     const now = Date.now();
+    const lastCallTime = lastCallTimestamps[featureType] || 0;
 
-    // Rate Limiting Check
-    if (now - lastAiCallTime < AI_CALL_WINDOW && aiCallCount >= AI_CALL_LIMIT) {
-      const timeLeft = Math.ceil((AI_CALL_WINDOW - (now - lastAiCallTime)) / 1000 / 60);
-      toast.warning(`Limite de chamadas IA atingido. Tente novamente em ${timeLeft} minuto(s).`);
+    // Consent Check
+    if (!aiConsentGiven) {
+      toast.error("Por favor, marque a caixa de consentimento para usar as funções de IA.");
       return;
     }
 
-    // Reset count if window expired
-    const currentCount = now - lastAiCallTime >= AI_CALL_WINDOW ? 1 : aiCallCount + 1;
+    // Per-Feature Rate Limiting Check
+    if (now - lastCallTime < MIN_INTERVAL_MS) {
+      const timeLeft = Math.ceil((MIN_INTERVAL_MS - (now - lastCallTime)) / 1000);
+      toast.warning(`Por favor, aguarde ${timeLeft} segundo(s) antes de usar esta função novamente.`);
+      return;
+    }
 
     if (!parsedMessages || parsedMessages.length === 0) {
       toast.error("Não há mensagens para analisar.");
       return;
     }
+
+    // Update timestamp immediately to prevent rapid clicks before API call finishes
+    setLastCallTimestamps(prev => ({ ...prev, [featureType]: now }));
 
     // Set loading state based on feature type
     if (featureType === 'prediction') setIsPredictionLoading(true);
@@ -159,24 +177,17 @@ const PremiumPage: React.FC = () => {
         case 'prediction':
         case 'poem': // Prediction and Poem use the same taskType and similar payload structure
           taskType = "generateCreativeText";
-          // The function expects analysis results, not a pre-made prompt
-          // We need to get these from the analysisResults in context
           if (!analysisResults) {
             toast.error("Resultados da análise não encontrados para gerar texto criativo.");
             throw new Error("Analysis results missing."); // Throw to exit and reset loading
           }
-          // Construct payload based on what the function expects
           const sentimentRatio = analysisResults.keywordCounts.positive / (analysisResults.keywordCounts.negative + 1);
           const sentimentMix = sentimentRatio > 1.5 ? 'Positivo' : sentimentRatio < 0.7 ? 'Negativo' : 'Equilibrado';
-          // Note: The function expects 'chatSign', which isn't directly in analysisResults.
-          // We might need to pass the heuristic sign generated in ResultsPage or recalculate/simplify here.
-          // For now, let's pass a placeholder or omit it if the function handles missing fields.
           payload = {
             mostFrequentEmoji: analysisResults.mostFrequentEmoji,
             favoriteWord: analysisResults.favoriteWord,
             sentimentMix: sentimentMix,
             chatSign: generatedSign || "Indefinido", // Pass the sign from context, with a fallback
-            // Add a sub-type to differentiate poem/prediction if needed by the function prompt logic
             creativeType: featureType // Send 'prediction' or 'poem'
           };
           break;
@@ -193,7 +204,6 @@ const PremiumPage: React.FC = () => {
             toast.error("Dados de análise por participante não encontrados.");
             throw new Error("Sender stats missing for flag personality analysis.");
           }
-          // Prepare payload with only flag keywords per sender
           payload = Object.entries(analysisResults.statsPerSender).reduce((acc, [sender, stats]) => {
             if (stats && (stats.redFlagKeywords?.length > 0 || stats.greenFlagKeywords?.length > 0)) {
               acc[sender] = {
@@ -206,28 +216,28 @@ const PremiumPage: React.FC = () => {
 
           if (Object.keys(payload).length === 0) {
              toast.info("Nenhum participante com Red/Green flags encontradas para análise de personalidade.");
-             // No need to call the function if payload is empty
              setIsFlagPersonalityLoading(false); // Reset loading state immediately
+             // Revert timestamp update since we didn't actually make a call
+             setLastCallTimestamps(prev => ({ ...prev, [featureType]: lastCallTime }));
              return; // Exit early
           }
           break;
         default:
            toast.error("Tipo de recurso de IA desconhecido.");
+           // Revert timestamp update
+           setLastCallTimestamps(prev => ({ ...prev, [featureType]: lastCallTime }));
            throw new Error("Unknown AI feature type."); // Throw to exit and reset loading
       }
 
       toast.info(`Solicitando ${featureType} da IA... Isso pode levar um momento.`);
-
-      // Log the data being sent to the function
       console.log("Calling Cloud Function with:", { taskType, payload });
 
-      // Call the Cloud Function with the correct structure
       const result = await callGeminiFunction({ taskType, payload });
 
-      // Check for general success first
       if (!(result?.data as any)?.success) {
-        // Extract potential error message from function response if available
         const errorMessage = (result?.data as any)?.error || "A IA não retornou um resultado válido ou indicou uma falha.";
+        // Revert timestamp update on failure
+        setLastCallTimestamps(prev => ({ ...prev, [featureType]: lastCallTime }));
         throw new Error(errorMessage);
       }
 
@@ -241,17 +251,19 @@ const PremiumPage: React.FC = () => {
             else if (featureType === 'poem') setAiPoem(trimmedResult);
             else if (featureType === 'style') setAiStyleAnalysis(trimmedResult);
           } else {
+             // Revert timestamp update on empty result
+             setLastCallTimestamps(prev => ({ ...prev, [featureType]: lastCallTime }));
              throw new Error(`A IA retornou um texto vazio para ${featureType}.`);
           }
         } else {
+          // Revert timestamp update on invalid format
+          setLastCallTimestamps(prev => ({ ...prev, [featureType]: lastCallTime }));
           throw new Error(`A IA não retornou um texto válido para ${featureType}. Tipo recebido: ${typeof textResult}`);
         }
       }
-      // Handle the JSON object result for flag personality
       else if (featureType === 'flagPersonality') {
          const personalityResult = (result?.data as any)?.result; // Expecting an object
          if (typeof personalityResult === 'object' && personalityResult !== null) {
-            // Check if the object is empty (which might be valid if no analysis was possible)
             if (Object.keys(personalityResult).length === 0) {
                toast.info("Nenhuma análise de personalidade gerada (sem flags suficientes?).");
                setAiFlagPersonalityAnalysis({}); // Set to empty object
@@ -262,20 +274,18 @@ const PremiumPage: React.FC = () => {
             console.error("Received unexpected format for flag personality analysis:", personalityResult);
             toast.error("Formato inesperado recebido da análise de personalidade por flags.");
             setAiFlagPersonalityAnalysis(null); // Reset or handle error state
+            // Revert timestamp update on invalid format
+            setLastCallTimestamps(prev => ({ ...prev, [featureType]: lastCallTime }));
             // Optionally throw an error if this state is unexpected
             // throw new Error(`Formato inesperado para ${featureType}. Tipo recebido: ${typeof personalityResult}`);
          }
       }
 
-      // Update rate limiting state
-      setLastAiCallTime(now);
-      setAiCallCount(currentCount);
-
-      // Use featureType for user message, but use taskType for logging if needed
+      // Timestamp already updated at the start of the successful attempt
       toast.success(`${featureType.charAt(0).toUpperCase() + featureType.slice(1)} gerado com sucesso!`);
 
     } catch (error: any) {
-       // Check if it's an HttpsError thrown by the function for specific feedback
+       // Timestamp should have been reverted inside the try block for specific errors
        if (error.code && error.message) {
          console.error(`Erro da Cloud Function (${error.code}) ao chamar IA para ${featureType}:`, error.message);
          toast.error(`Falha ao gerar ${featureType}: ${error.message}`);
@@ -283,6 +293,8 @@ const PremiumPage: React.FC = () => {
          console.error(`Erro inesperado ao chamar IA para ${featureType}:`, error);
          toast.error(`Falha ao gerar ${featureType}. ${error.message || 'Tente novamente mais tarde.'}`);
        }
+       // Ensure timestamp is reverted if not already done
+       setLastCallTimestamps(prev => ({ ...prev, [featureType]: lastCallTime }));
     } finally {
       // Reset loading state based on feature type
       if (featureType === 'prediction') setIsPredictionLoading(false);
@@ -290,7 +302,7 @@ const PremiumPage: React.FC = () => {
       else if (featureType === 'style') setIsStyleLoading(false);
       else if (featureType === 'flagPersonality') setIsFlagPersonalityLoading(false);
     }
-  }, [parsedMessages, analysisResults, generatedSign, lastAiCallTime, aiCallCount, setAiPrediction, setAiPoem, setAiStyleAnalysis, setAiFlagPersonalityAnalysis, setLastAiCallTime, setAiCallCount]); // Added setAiFlagPersonalityAnalysis
+  }, [parsedMessages, analysisResults, generatedSign, lastCallTimestamps, setAiPrediction, setAiPoem, setAiStyleAnalysis, setAiFlagPersonalityAnalysis]); // Updated dependencies
 
 
   // TODO: Fetch and display actual non-AI premium content based on context/state (analysisResults)
@@ -315,13 +327,27 @@ const PremiumPage: React.FC = () => {
             <p className="text-gray-700 mb-4">
               Aqui você encontrará insights mais profundos e análises avançadas sobre sua conversa.
             </p>
+
+            {/* AI Consent Checkbox */}
+            <div className="flex items-center space-x-2 bg-yellow-100 border border-yellow-300 text-yellow-800 p-3 rounded-md mb-6 text-sm">
+              <Checkbox
+                id="ai-consent"
+                checked={aiConsentGiven}
+                onCheckedChange={(checked) => setAiConsentGiven(checked as boolean)}
+                aria-label="Consentimento para uso de IA"
+              />
+              <Label htmlFor="ai-consent" className="leading-snug cursor-pointer">
+                Concordo em enviar dados anonimizados do chat (nomes substituídos por "Pessoa 1", "Pessoa 2", etc.) para a API da Google (Gemini) para gerar as análises de IA abaixo. Nenhum dado pessoal identificável é enviado.
+              </Label>
+            </div>
+
             {/* AI Premium Content */}
             <div className="space-y-4 mb-6">
               {/* AI Prediction Card */}
               <Card className="bg-white p-4">
                 <CardHeader className="p-0 pb-2 flex flex-row items-center justify-between">
                    <CardTitle className="text-lg text-indigo-700 flex items-center"><Sparkles className="w-5 h-5 mr-2 text-yellow-500"/> Previsão do Chat (IA)</CardTitle>
-                   <Button size="sm" onClick={() => callAIFeature('prediction')} disabled={isPredictionLoading || isPoemLoading || isStyleLoading}>
+                   <Button size="sm" onClick={() => callAIFeature('prediction')} disabled={!aiConsentGiven || isPredictionLoading || isPoemLoading || isStyleLoading || isFlagPersonalityLoading}>
                      {isPredictionLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4"/>}
                      Gerar
                    </Button>
@@ -341,7 +367,7 @@ const PremiumPage: React.FC = () => {
               <Card className="bg-white p-4">
                  <CardHeader className="p-0 pb-2 flex flex-row items-center justify-between">
                    <CardTitle className="text-lg text-indigo-700 flex items-center"><Feather className="w-5 h-5 mr-2 text-blue-500"/> Poema do Chat (IA)</CardTitle>
-                   <Button size="sm" onClick={() => callAIFeature('poem')} disabled={isPredictionLoading || isPoemLoading || isStyleLoading}>
+                   <Button size="sm" onClick={() => callAIFeature('poem')} disabled={!aiConsentGiven || isPredictionLoading || isPoemLoading || isStyleLoading || isFlagPersonalityLoading}>
                      {isPoemLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Feather className="mr-2 h-4 w-4"/>}
                      Gerar
                    </Button>
@@ -361,7 +387,7 @@ const PremiumPage: React.FC = () => {
               <Card className="bg-white p-4">
                  <CardHeader className="p-0 pb-2 flex flex-row items-center justify-between">
                    <CardTitle className="text-lg text-indigo-700 flex items-center"><BrainCircuit className="w-5 h-5 mr-2 text-green-500"/> Estilo de Comunicação (IA)</CardTitle>
-                   <Button size="sm" onClick={() => callAIFeature('style')} disabled={isPredictionLoading || isPoemLoading || isStyleLoading}>
+                   <Button size="sm" onClick={() => callAIFeature('style')} disabled={!aiConsentGiven || isPredictionLoading || isPoemLoading || isStyleLoading || isFlagPersonalityLoading}>
                      {isStyleLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BrainCircuit className="mr-2 h-4 w-4"/>}
                      Analisar
                    </Button>
@@ -452,12 +478,86 @@ const PremiumPage: React.FC = () => {
                  </CardContent>
               </Card>
 
+              {/* Detailed Red/Green Flags Card */}
+              {analysisResults && (analysisResults.totalRedFlags > 0 || analysisResults.totalGreenFlags > 0) && (
+                <Card className="bg-white p-4">
+                  <CardHeader className="p-0 pb-2">
+                    <CardTitle className="text-lg text-indigo-700 flex items-center">
+                      🚩 Detalhes dos Sinais 💚
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="space-y-4">
+                      {/* Overall Counts */}
+                      <div className="flex justify-around text-center border-b pb-3 mb-3 border-gray-200">
+                        <div>
+                          <p className="text-2xl font-bold text-red-500">{analysisResults.totalRedFlags ?? 0}</p>
+                          <p className="text-xs opacity-80">Total Red Flags 🚩</p>
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-green-500">{analysisResults.totalGreenFlags ?? 0}</p>
+                          <p className="text-xs opacity-80">Total Green Flags 💚</p>
+                        </div>
+                      </div>
+
+                      {/* Per-Sender Details */}
+                      <h5 className="text-sm font-semibold text-gray-600">Detalhes por Participante:</h5>
+                      <div className="space-y-3">
+                        {Object.entries(analysisResults.statsPerSender)
+                          .filter(([, stats]) => (stats?.redFlagKeywords?.length ?? 0) > 0 || (stats?.greenFlagKeywords?.length ?? 0) > 0) // Only show senders with flag keywords
+                          .sort(([, statsA], [, statsB]) => (statsB?.messageCount ?? 0) - (statsA?.messageCount ?? 0))
+                          .map(([sender, stats]) => (
+                            <div key={sender} className={`p-2 rounded ${sender === selectedSender ? 'bg-blue-50' : ''}`}>
+                              <p className="font-semibold text-sm text-gray-800 mb-1">{sender}:</p>
+                              {stats?.redFlagKeywords && stats.redFlagKeywords.length > 0 && (
+                                <div className="mb-1">
+                                  <p className="text-xs text-red-600 flex items-center font-medium">
+                                    <ThumbsDown className="w-3 h-3 mr-1.5"/> Red Flags ({stats.redFlagCount ?? stats.redFlagKeywords.length}):
+                                  </p>
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {/* Count unique keywords */}
+                                    {Object.entries(stats.redFlagKeywords.reduce((acc, kw) => { acc[kw] = (acc[kw] || 0) + 1; return acc; }, {} as Record<string, number>))
+                                      .sort(([, countA], [, countB]) => countB - countA) // Sort by count desc
+                                      .map(([keyword, count], idx) => (
+                                        <Badge key={idx} variant="destructive" className="text-xs font-normal">
+                                          {keyword} {count > 1 ? <span className="ml-1 opacity-75">({count}x)</span> : ''}
+                                        </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {stats?.greenFlagKeywords && stats.greenFlagKeywords.length > 0 && (
+                                <div>
+                                  <p className="text-xs text-green-600 flex items-center font-medium">
+                                    <ThumbsUp className="w-3 h-3 mr-1.5"/> Green Flags ({stats.greenFlagCount ?? stats.greenFlagKeywords.length}):
+                                  </p>
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {/* Count unique keywords */}
+                                    {Object.entries(stats.greenFlagKeywords.reduce((acc, kw) => { acc[kw] = (acc[kw] || 0) + 1; return acc; }, {} as Record<string, number>))
+                                      .sort(([, countA], [, countB]) => countB - countA) // Sort by count desc
+                                      .map(([keyword, count], idx) => (
+                                        <Badge key={idx} variant="outline" className="text-xs font-normal border-green-500/50 bg-green-50 text-green-700">
+                                          {keyword} {count > 1 ? <span className="ml-1 opacity-75">({count}x)</span> : ''}
+                                        </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                      </div>
+                       <p className="text-xs text-center opacity-70 pt-2">Lista de palavras/frases que acionaram os sinais. Lembre-se que o contexto é importante.</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* AI Flag Personality Analysis Card */}
               <Card className="bg-white p-4">
                  <CardHeader className="p-0 pb-2 flex flex-row items-center justify-between">
                    <CardTitle className="text-lg text-indigo-700 flex items-center"><UserCheck className="w-5 h-5 mr-2 text-teal-600"/> Personalidade por Sinais (IA)</CardTitle>
                    {/* Ensure callAIFeature type includes 'flagPersonality' */}
-                   <Button size="sm" onClick={() => callAIFeature('flagPersonality')} disabled={isPredictionLoading || isPoemLoading || isStyleLoading || isFlagPersonalityLoading}>
+                   <Button size="sm" onClick={() => callAIFeature('flagPersonality')} disabled={!aiConsentGiven || isPredictionLoading || isPoemLoading || isStyleLoading || isFlagPersonalityLoading}>
                      {isFlagPersonalityLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BrainCircuit className="mr-2 h-4 w-4"/>}
                      Analisar Flags
                    </Button>

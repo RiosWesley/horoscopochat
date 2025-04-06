@@ -83,6 +83,7 @@ Create a functional web application that analyzes uploaded WhatsApp chat `.txt` 
     *   [X] Implement Save/Share functionality (`/results/:analysisId`, Firestore save/load via Cloud Functions, including premium status display on shared links).
         *   [X] Fix Signo display on shared links (save/load `generatedSign`).
         *   [X] Include Red/Green flag counts in saved data (`functions/src/index.ts`).
+    *   [X] Implement per-feature rate limiting (30s interval) for AI calls on Premium Page (`PremiumPage.tsx`).
 6.  **UI Components & Visualization:**
     *   [X] Create `ContactBubble` component to display sender names and message counts.
     *   [X] Create `SentimentChart` component using Recharts for displaying sentiment analysis.
@@ -101,6 +102,7 @@ Create a functional web application that analyzes uploaded WhatsApp chat `.txt` 
     *   [X] Create `TimelineChart` component for daily/weekly activity visualization.
     *   [X] Add User Selector dropdown in `ResultsPage.tsx`.
     *   [X] Add Red/Green Flag analysis section in `ResultsPage.tsx` (with premium breakdown).
+    *   [X] Add staggered fade-in animation to result cards on `ResultsPage.tsx` using `framer-motion`.
 
 ## Next Steps
 
@@ -114,13 +116,12 @@ Create a functional web application that analyzes uploaded WhatsApp chat `.txt` 
     *   [X] Handle JSON response.
     *   [X] Update `AnalysisResultsToSave` interface.
 *   [X] Deploy Firebase Cloud Functions (`callGemini`, `saveAnalysisResults`, `getAnalysisResults`).
-*   Add animations for transitions between different views and states.
+*   [ ] Add animations for transitions between different views and states. (Card animation done, others pending)
 *   Further refine chat parsing for any remaining edge cases if needed.
 *   Explore ad integration (e.g., AdSense/AdMob) as an additional monetization strategy.
 *   Implement *actual* premium features and subscription handling (currently mocked).
-*   Securely manage API keys using environment variables/secrets management for production.
-*   Add explicit user consent flow for sending data to AI APIs.
-*   Add animations for transitions between different views and states.
+*   [X] Securely manage API keys using environment variables/secrets management for production (`.env` for Firebase frontend, `functions:config` for Gemini backend).
+*   [X] Add explicit user consent flow (checkbox) for sending data to AI APIs on Premium Page (`PremiumPage.tsx`).
 *   Add tutorial/onboarding overlays to guide users through the application.
 
 ---

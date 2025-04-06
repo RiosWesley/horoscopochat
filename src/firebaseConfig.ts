@@ -2,15 +2,21 @@
 import { initializeApp } from "firebase/app";
 
 // Your web app's Firebase configuration
-// TODO: Consider moving sensitive keys to environment variables for production builds
+// Read configuration from Vite environment variables
 const firebaseConfig = {
-  apiKey: "AIzaSyAVCn02NeIdTGXBOrQZChz7xDUGx02rgdQ",
-  authDomain: "horoscopozap.firebaseapp.com",
-  projectId: "horoscopozap",
-  storageBucket: "horoscopozap.appspot.com", // Corrected storage bucket domain
-  messagingSenderId: "440494941769",
-  appId: "1:440494941769:web:77b41d6346b065d1ccc198"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
+
+// Validate that environment variables are loaded
+if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+  console.error("Firebase configuration environment variables (VITE_FIREBASE_...) are missing!");
+  // You might want to throw an error or display a message to the user in a real app
+}
 
 // Initialize Firebase
 const firebaseApp = initializeApp(firebaseConfig);

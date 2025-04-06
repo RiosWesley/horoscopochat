@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import html2canvas from 'html2canvas';
+import { motion } from 'framer-motion'; // Import motion
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { firebaseApp } from '@/firebaseConfig';
 import { Button } from '@/components/ui/button';
@@ -508,10 +509,40 @@ const ResultsPage = () => {
   }
 
 
+  // Animation variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1 // Delay between each card animation
+      }
+    }
+  };
+
+  const cardVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        type: "spring",
+        stiffness: 100,
+        damping: 12
+      }
+    }
+  };
+
   return (
     <GradientBackground>
-      <div className="flex flex-col min-h-screen pb-24 px-4 pt-6">
-        {/* Header */}
+      {/* Wrap the main content area for staggering */}
+      <motion.div
+        className="flex flex-col min-h-screen pb-24 px-4 pt-6"
+        initial="hidden"
+        animate="visible"
+        variants={containerVariants}
+      >
+        {/* Header (Not animated as part of the stagger) */}
         <div className="flex justify-between items-center mb-4">
           <div>
              <h2 className="text-lg font-medium opacity-80">{timeOfDay}, Astroanalista!</h2>
@@ -538,7 +569,7 @@ const ResultsPage = () => {
         </div>
 
         {/* Generated Sign Card */}
-        <div className="cosmic-card bg-gradient-purple-pink text-white mb-8">
+        <motion.div className="cosmic-card bg-gradient-purple-pink text-white mb-8" variants={cardVariants}>
           <div className="text-center">
             <FloatingEmoji emoji="✨" size="md" />
             <h2 className="text-2xl font-bold my-2">{displaySign || "Signo Indefinido"}</h2>
@@ -546,12 +577,13 @@ const ResultsPage = () => {
             {!analysisId && generatedSignoDescription && <p className="text-sm opacity-90 px-4">{generatedSignoDescription}</p>}
             <FloatingEmoji emoji="✨" size="md" />
           </div>
-        </div>
+        </motion.div>
 
         {/* Participants Card */}
-        <ResultCard title="Participantes" variant="primary">
-          <div className="space-y-4">
-            {!analysisId && <p className="text-sm opacity-80 mb-2">Clique em um participante para ver detalhes:</p>}
+        <motion.div variants={cardVariants}>
+          <ResultCard title="Participantes" variant="primary">
+            <div className="space-y-4">
+              {!analysisId && <p className="text-sm opacity-80 mb-2">Clique em um participante para ver detalhes:</p>}
             <div className="flex flex-wrap gap-2 justify-center">
               {analysisResults.messagesPerSender && Object.entries(analysisResults.messagesPerSender)
                 .sort(([, countA], [, countB]) => (countB ?? 0) - (countA ?? 0))
@@ -567,11 +599,12 @@ const ResultsPage = () => {
                     />
                   </div>
                 ))}
+              </div>
             </div>
-          </div>
-        </ResultCard>
+          </ResultCard>
+        </motion.div>
 
-        {/* --- User Selector --- */}
+        {/* --- User Selector (Not a card, keep outside stagger or wrap separately if needed) --- */}
         {!analysisId && analysisResults?.messagesPerSender && Object.keys(analysisResults.messagesPerSender).length > 0 && (
           <div className="mb-6 px-4 py-3 bg-black/10 rounded-lg">
             <Label htmlFor="user-selector" className="text-sm font-medium mb-2 block opacity-80">Quem é você na conversa?</Label>
@@ -594,9 +627,10 @@ const ResultsPage = () => {
 
         {/* Activity Card */}
         {isFullAnalysisResults(analysisResults) && !analysisId && (
-          <ResultCard title="Atividade do Chat" variant="default">
-            <div className="space-y-4">
-              <div className="flex justify-center mb-4">
+          <motion.div variants={cardVariants}>
+            <ResultCard title="Atividade do Chat" variant="default">
+              <div className="space-y-4">
+                <div className="flex justify-center mb-4">
                 <ToggleGroup type="single" value={selectedChartView} onValueChange={(value) => value && setSelectedChartView(value as any)}>
                   <ToggleGroupItem value="daily" aria-label="Daily View" className="flex gap-1 items-center">
                     <LineChart className="h-3.5 w-3.5" /> Dias
@@ -617,26 +651,30 @@ const ResultsPage = () => {
                    data={Object.entries(analysisResults.messagesPerDayOfWeek).map(([dayIndex, count]) => ({ name: dayIndex, value: count }))}
                    viewType="weekly"
                  />
-              )}
-            </div>
-          </ResultCard>
+                )}
+              </div>
+            </ResultCard>
+          </motion.div>
         )}
 
         {/* Overview Card */}
-        <ResultCard title="Visão Geral do Chat" variant="default">
-           <div className="space-y-3">
-             <div className="flex justify-between items-center"><span className="font-medium flex items-center"><MessageSquareText className="w-4 h-4 mr-2 opacity-70"/>Total de Mensagens:</span><span className="font-bold text-lg">{analysisResults.totalMessages ?? 'N/A'}</span></div>
+        <motion.div variants={cardVariants}>
+          <ResultCard title="Visão Geral do Chat" variant="default">
+             <div className="space-y-3">
+               <div className="flex justify-between items-center"><span className="font-medium flex items-center"><MessageSquareText className="w-4 h-4 mr-2 opacity-70"/>Total de Mensagens:</span><span className="font-bold text-lg">{analysisResults.totalMessages ?? 'N/A'}</span></div>
              <div className="flex justify-between items-center"><span className="font-medium flex items-center"><Text className="w-4 h-4 mr-2 opacity-70"/>Tamanho Médio:</span><span className="font-bold text-lg">{analysisResults.averageMessageLength?.toFixed(0) ?? 'N/A'} <span className="text-xs opacity-70">caracteres</span></span></div>
              {isFullAnalysisResults(analysisResults) && analysisResults.mostFrequentKeywordCategory === 'laughter' && (<p className="text-sm opacity-80 pt-1 flex items-center"><Laugh className="w-4 h-4 mr-1 text-yellow-500"/> Clima geral: Descontraído</p>)}
              {isFullAnalysisResults(analysisResults) && analysisResults.mostFrequentKeywordCategory === 'questions' && (<p className="text-sm opacity-80 pt-1 flex items-center"><QuestionIcon className="w-4 h-4 mr-1 text-blue-500"/> Clima geral: Investigativo</p>)}
-           </div>
-        </ResultCard>
+             </div>
+          </ResultCard>
+        </motion.div>
 
         {/* Per-Sender Analysis */}
         {analysisResults.statsPerSender && Object.keys(analysisResults.statsPerSender).length > 1 && (
-          <ResultCard title="Análise por Participante" variant="secondary">
-            <div className="space-y-4">
-              {Object.entries(analysisResults.statsPerSender)
+          <motion.div variants={cardVariants}>
+            <ResultCard title="Análise por Participante" variant="secondary">
+              <div className="space-y-4">
+                {Object.entries(analysisResults.statsPerSender)
                 .sort(([, statsA], [, statsB]) => (statsB?.messageCount ?? 0) - (statsA?.messageCount ?? 0))
                 .map(([sender, stats]) => {
                   const safeStats = stats || {};
@@ -676,15 +714,17 @@ const ResultsPage = () => {
                       </div>
                     </div>
                   );
-              })}
-            </div>
-          </ResultCard>
+                })}
+              </div>
+            </ResultCard>
+          </motion.div>
         )}
 
         {/* Sentiment Mix Card */}
-        <ResultCard title="Mix de Vibrações" variant="default">
-          {analysisResults.keywordCounts && (analysisResults.keywordCounts.positive > 0 || analysisResults.keywordCounts.negative > 0) ? (
-            <div className="space-y-2">
+        <motion.div variants={cardVariants}>
+          <ResultCard title="Mix de Vibrações" variant="default">
+            {analysisResults.keywordCounts && (analysisResults.keywordCounts.positive > 0 || analysisResults.keywordCounts.negative > 0) ? (
+              <div className="space-y-2">
               <div className="flex items-center mb-2"><span className="mr-2 opacity-80">Balanço Energético:</span></div>
               <div className="w-full bg-gray-200 rounded-full h-6 flex overflow-hidden">
                 {analysisResults.keywordCounts.positive > 0 && (<div className="h-6 bg-gradient-to-r from-green-400 to-emerald-500 flex items-center justify-center text-xs text-white font-medium" style={{ width: `${(analysisResults.keywordCounts.positive / (analysisResults.keywordCounts.positive + analysisResults.keywordCounts.negative + 0.001)) * 100}%` }} title={`Positivas: ${analysisResults.keywordCounts.positive}`}>Positiva</div>)}
@@ -732,9 +772,10 @@ const ResultsPage = () => {
                     return null; // Don't render if no sentiment data
                   })}
               </div>
-            </div>
-          ) : (<p className="text-sm opacity-70 text-center py-4">Não foi possível determinar o balanço de vibrações.</p>)}
-        </ResultCard>
+              </div>
+            ) : (<p className="text-sm opacity-70 text-center py-4">Não foi possível determinar o balanço de vibrações.</p>)}
+          </ResultCard>
+        </motion.div>
 
         {/* --- Red/Green Flags Card --- */}
         {/* Show this card only if there are flags OR if it's a shared link (where flags might exist but aren't calculated client-side) */}
@@ -743,9 +784,10 @@ const ResultsPage = () => {
         {( (analysisResults && 'totalRedFlags' in analysisResults && analysisResults.totalRedFlags > 0) ||
            (analysisResults && 'totalGreenFlags' in analysisResults && analysisResults.totalGreenFlags > 0) ||
            analysisId ) && (
-          <ResultCard title="🚩 Balanço de Sinais 💚" variant="secondary">
-            <div className="space-y-4">
-              <p className="text-xs text-center opacity-70">Contagem de frases ou padrões que podem indicar sinais de alerta (Red Flags 🚩) ou sinais positivos (Green Flags 💚) na comunicação. Lembre-se: contexto é tudo!</p>
+          <motion.div variants={cardVariants}>
+            <ResultCard title="🚩 Balanço de Sinais 💚" variant="secondary">
+              <div className="space-y-4">
+                <p className="text-xs text-center opacity-70">Contagem de frases ou padrões que podem indicar sinais de alerta (Red Flags 🚩) ou sinais positivos (Green Flags 💚) na comunicação. Lembre-se: contexto é tudo!</p>
 
               {/* Overall Counts - Safe Access */}
               <div className="flex justify-around text-center">
@@ -790,15 +832,17 @@ const ResultsPage = () => {
                   </Button>
                 </div>
               ) : null /* Don't show teaser on shared links if not premium */}
-            </div>
-          </ResultCard>
+              </div>
+            </ResultCard>
+          </motion.div>
         )}
 
 
         {/* Expressions Card */}
-        <ResultCard title="Suas Expressões Favoritas" variant="primary">
-          <div className="space-y-4">
-            {analysisResults.topExpressions && analysisResults.topExpressions.length > 0 ? (
+        <motion.div variants={cardVariants}>
+          <ResultCard title="Suas Expressões Favoritas" variant="primary">
+            <div className="space-y-4">
+              {analysisResults.topExpressions && analysisResults.topExpressions.length > 0 ? (
               <div className="flex flex-wrap gap-2 justify-center">
                 {analysisResults.topExpressions.map((exp, index) => (
                   <div key={index} className="bg-white/20 rounded-full px-3 py-1.5 text-sm font-medium">
@@ -821,34 +865,41 @@ const ResultsPage = () => {
               </div>
             ) : (
               <p className="text-sm opacity-70 text-center">Nenhuma palavra favorita identificada.</p>
-            )}
-          </div>
-        </ResultCard>
+              )}
+            </div>
+          </ResultCard>
+        </motion.div>
 
         {/* Highlights Card */}
-        <ResultCard title="Destaques do Chat" variant="primary">
-          <div className="space-y-4">
-            {analysisResults.mostFrequentEmoji ? (<> <div className="flex justify-between items-center"><span className="font-medium">Emoji Principal:</span><span className="text-4xl">{analysisResults.mostFrequentEmoji}</span></div> <p className="text-sm">Seu espírito animal digital é o {analysisResults.mostFrequentEmoji}!</p> </>) : (<p className="text-sm opacity-70">Nenhum emoji frequente encontrado.</p>)}
+        <motion.div variants={cardVariants}>
+          <ResultCard title="Destaques do Chat" variant="primary">
+            <div className="space-y-4">
+              {analysisResults.mostFrequentEmoji ? (<> <div className="flex justify-between items-center"><span className="font-medium">Emoji Principal:</span><span className="text-4xl">{analysisResults.mostFrequentEmoji}</span></div> <p className="text-sm">Seu espírito animal digital é o {analysisResults.mostFrequentEmoji}!</p> </>) : (<p className="text-sm opacity-70">Nenhum emoji frequente encontrado.</p>)}
             {/* Most Active Hour might not be saved, handle this */}
             {isFullAnalysisResults(analysisResults) && analysisResults.mostActiveHour !== undefined && analysisResults.mostActiveHour !== null ? (<> <div className="flex items-center"><Clock className="h-5 w-5 mr-2" /><span className="font-medium">Horário Nobre: </span><span className="ml-2 bg-white/30 px-2 py-0.5 rounded font-bold">{`${analysisResults.mostActiveHour.toString().padStart(2, '0')}:00 - ${(analysisResults.mostActiveHour + 1).toString().padStart(2, '0')}:00`}</span></div> <p className="text-sm">Sua energia de chat bomba entre <strong>{analysisResults.mostActiveHour}:00</strong> e <strong>{(analysisResults.mostActiveHour + 1)}:00</strong>.</p> </>) : analysisId ? null : (<p className="text-sm opacity-70">Não foi possível determinar o horário nobre.</p>)}
-            {analysisResults.favoriteWord ? (<div className="flex justify-between items-center pt-2"><span className="font-medium">Palavra Favorita:</span><span className="bg-white/30 px-3 py-1 rounded-full font-bold">{analysisResults.favoriteWord}</span></div>) : (<div className="flex justify-between items-center pt-2"><span className="font-medium">Palavra Favorita:</span><span className="text-sm opacity-70">Nenhuma palavra marcante encontrada.</span></div>)}
-          </div>
-        </ResultCard>
+              {analysisResults.favoriteWord ? (<div className="flex justify-between items-center pt-2"><span className="font-medium">Palavra Favorita:</span><span className="bg-white/30 px-3 py-1 rounded-full font-bold">{analysisResults.favoriteWord}</span></div>) : (<div className="flex justify-between items-center pt-2"><span className="font-medium">Palavra Favorita:</span><span className="text-sm opacity-70">Nenhuma palavra marcante encontrada.</span></div>)}
+            </div>
+          </ResultCard>
+        </motion.div>
 
         {/* Emoji Cloud Card */}
-        <ResultCard title="Seu Universo de Emoji" variant="secondary">
-          {emojiCloudData.length > 0 ? (
-             <EmojiCloud emojis={emojiCloudData} />
+        <motion.div variants={cardVariants}>
+          <ResultCard title="Seu Universo de Emoji" variant="secondary">
+            {emojiCloudData.length > 0 ? (
+               <EmojiCloud emojis={emojiCloudData} />
           ) : (
-             <p className="text-sm opacity-70 text-center py-4">Nenhum emoji encontrado.</p>
-          )}
-        </ResultCard>
+               <p className="text-sm opacity-70 text-center py-4">Nenhum emoji encontrado.</p>
+            )}
+          </ResultCard>
+        </motion.div>
 
         {/* Fun Facts Card - Hide if shared link as they are generated dynamically */}
         {!analysisId && (
-          <ResultCard title="Pequenas Verdades Cósmicas" variant="accent">
-             {generatedFunFacts.length > 0 ? (<ul className="space-y-3">{generatedFunFacts.map((fact, index) => (<li key={index} className="flex items-start"><span className="mr-2 text-lg">•</span><span>{fact}</span></li>))}</ul>) : (<p className="text-sm opacity-70 text-center py-4">Nenhuma verdade cósmica encontrada por enquanto.</p>)}
-          </ResultCard>
+          <motion.div variants={cardVariants}>
+            <ResultCard title="Pequenas Verdades Cósmicas" variant="accent">
+               {generatedFunFacts.length > 0 ? (<ul className="space-y-3">{generatedFunFacts.map((fact, index) => (<li key={index} className="flex items-start"><span className="mr-2 text-lg">•</span><span>{fact}</span></li>))}</ul>) : (<p className="text-sm opacity-70 text-center py-4">Nenhuma verdade cósmica encontrada por enquanto.</p>)}
+            </ResultCard>
+          </motion.div>
         )}
 
         {/* --- Premium Section --- */}
@@ -858,9 +909,10 @@ const ResultsPage = () => {
             {/* Premium Stats Card (PA & Flirt) - Now shown if premium or shared */}
             {/* Also ensure the specific percentages exist before rendering the card */}
             {(analysisResults.passiveAggressivePercentage !== null || analysisResults.flirtationPercentage !== null) && (
-              <ResultCard title="Análises Premium (PA/Flerte)" variant="accent">
-                <div className="space-y-3">
-                  {analysisResults.passiveAggressivePercentage !== null && (
+              <motion.div variants={cardVariants}>
+                <ResultCard title="Análises Premium (PA/Flerte)" variant="accent">
+                  <div className="space-y-3">
+                    {analysisResults.passiveAggressivePercentage !== null && (
                     <div className="flex justify-between items-center">
                       <span className="font-medium flex items-center"><Users className="w-4 h-4 mr-2 opacity-70"/>Passivo-Agressivo (% msgs):</span>
                       <span className="font-bold text-lg">{analysisResults.passiveAggressivePercentage?.toFixed(1) ?? '0.0'}%</span>
@@ -871,20 +923,23 @@ const ResultsPage = () => {
                       <span className="font-medium flex items-center"><Smile className="w-4 h-4 mr-2 opacity-70"/>Flerte (% msgs):</span>
                       <span className="font-bold text-lg">{analysisResults.flirtationPercentage?.toFixed(1) ?? '0.0'}%</span>
                     </div>
-                  )}
-                  <p className="text-xs opacity-70 pt-1">Porcentagem de mensagens com indicadores passivo-agressivos ou de flerte.</p>
-                </div>
-              </ResultCard>
+                    )}
+                    <p className="text-xs opacity-70 pt-1">Porcentagem de mensagens com indicadores passivo-agressivos ou de flerte.</p>
+                  </div>
+                </ResultCard>
+              </motion.div>
             )}
             {/* Display AI results if they exist in loaded data */}
             {analysisId && (loadedResults?.aiPrediction || loadedResults?.aiPoem || loadedResults?.aiStyleAnalysis) && (
-              <ResultCard title="Resultados da IA (Salvos)" variant="secondary" className="mt-4">
-                <div className="space-y-3 text-sm">
-                  {loadedResults?.aiPrediction && <div><h4 className="font-semibold mb-1 text-indigo-700">🔮 Previsão:</h4><p className="text-gray-700 whitespace-pre-wrap">{loadedResults.aiPrediction}</p></div>}
+              <motion.div variants={cardVariants}>
+                <ResultCard title="Resultados da IA (Salvos)" variant="secondary" className="mt-4">
+                  <div className="space-y-3 text-sm">
+                    {loadedResults?.aiPrediction && <div><h4 className="font-semibold mb-1 text-indigo-700">🔮 Previsão:</h4><p className="text-gray-700 whitespace-pre-wrap">{loadedResults.aiPrediction}</p></div>}
                   {loadedResults?.aiPoem && <div className="mt-2 pt-2 border-t"><h4 className="font-semibold mb-1 text-indigo-700">✍️ Poema:</h4><p className="text-gray-700 whitespace-pre-wrap">{loadedResults.aiPoem}</p></div>}
-                  {loadedResults?.aiStyleAnalysis && <div className="mt-2 pt-2 border-t"><h4 className="font-semibold mb-1 text-indigo-700">🎭 Estilo:</h4><p className="text-gray-700 whitespace-pre-wrap">{loadedResults.aiStyleAnalysis}</p></div>}
-                </div>
-              </ResultCard>
+                    {loadedResults?.aiStyleAnalysis && <div className="mt-2 pt-2 border-t"><h4 className="font-semibold mb-1 text-indigo-700">🎭 Estilo:</h4><p className="text-gray-700 whitespace-pre-wrap">{loadedResults.aiStyleAnalysis}</p></div>}
+                  </div>
+                </ResultCard>
+              </motion.div>
             )}
             {/* Button to navigate to the dedicated premium area (only if not shared link AND premium mock is active) */}
             {!analysisId && isPremiumMock && (
@@ -900,12 +955,14 @@ const ResultsPage = () => {
           </>
         ) : ( // Show upsell only if not viewing shared link AND not premium mock
            !analysisId && !isPremiumMock && (
-             <ResultCard title="Desbloqueie Análises Premium ✨" variant="accent">
-               <div className="text-center py-4">
-                 <p className="mb-3">Obtenha insights sobre flerte, passivo-agressividade, IA e mais com o Premium!</p>
-                 <Button onClick={handlePremiumClick} size="sm" className="bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white">Ver Vantagens Premium</Button>
-               </div>
-             </ResultCard>
+             <motion.div variants={cardVariants}>
+               <ResultCard title="Desbloqueie Análises Premium ✨" variant="accent">
+                 <div className="text-center py-4">
+                   <p className="mb-3">Obtenha insights sobre flerte, passivo-agressividade, IA e mais com o Premium!</p>
+                   <Button onClick={handlePremiumClick} size="sm" className="bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white">Ver Vantagens Premium</Button>
+                 </div>
+               </ResultCard>
+             </motion.div>
            )
         )}
 
@@ -966,10 +1023,24 @@ const ResultsPage = () => {
            <Button variant="outline" size="sm" className="border-white/30 bg-white/10 text-sm">Ver Tutorial</Button>
         </div>
         {/* Share Button (Always show?) */}
+         {/* Action buttons are not cards, keep outside stagger */}
+         <div className="mt-8 mb-4">
+            {/* Premium Upsell Button (Hide if shared link or already premium) */}
+            {!analysisId && !isPremiumMock && (
+              <Button onClick={handlePremiumClick} className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-white font-semibold py-4 rounded-xl shadow-lg">Desbloqueie Análises Premium ✨</Button>
+            )}
+         </div>
+         <div className="flex justify-center space-x-4 mb-16">
+           {/* Analyze Another Button (Always show?) */}
+           <Button onClick={handleAnalyzeAnother} variant="outline" size="sm" className="border-white/30 bg-white/10 text-sm">Analisar Outro Chat</Button>
+           {/* Tutorial Button (Always show?) */}
+           <Button variant="outline" size="sm" className="border-white/30 bg-white/10 text-sm">Ver Tutorial</Button>
+        </div>
+        {/* Share Button (Always show?) */}
         <ShareButton onClick={handleShare} />
-      </div>
+      </motion.div> {/* End of container motion.div */}
 
-      {/* Sender Focus Modal (Hide if shared link) */}
+      {/* Sender Focus Modal (Hide if shared link) - Keep outside main animation flow */}
       {!analysisId && focusedSender && analysisResults?.statsPerSender?.[focusedSender] && (
         <SenderFocus
           sender={focusedSender}
