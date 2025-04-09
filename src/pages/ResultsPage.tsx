@@ -22,6 +22,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import SenderFocus from '@/components/SenderFocus';
 import ShareableImage from '@/components/ShareableImage';
 import TimelineChart from '@/components/TimelineChart';
+import AdBanner from '@/components/AdBanner';
 import type { AnalysisResults as FullAnalysisResults, SenderStats } from '../lib/analyzeChat';
 import type { ParsedMessage } from '../lib/parseChat';
 // Import the exported type from functions - Adjust path if build process changes it
@@ -90,9 +91,10 @@ const ResultsPage = () => {
     setFocusedSender,
     resetAnalysis,
     setGeneratedSign,
-    aiPrediction,
-    aiPoem,
-    aiStyleAnalysis,
+    aiPrediction, // AI Prediction from context
+    aiPoem, // AI Poem from context
+    aiStyleAnalysis, // AI Style Analysis from context
+    aiFlagPersonalityAnalysis, // AI Flag Analysis from context
     generatedSign: contextGeneratedSign,
     selectedSender, // Added selectedSender
     setSelectedSender, // Added setSelectedSender
@@ -101,6 +103,7 @@ const ResultsPage = () => {
   } = context;
 
   // Determine which results to use: loaded from Firestore or from context
+  // Use AnalysisResultsToSave for loadedResults, FullAnalysisResults for context
   const analysisResults: FullAnalysisResults | AnalysisResultsToSave | null = analysisId ? loadedResults : contextAnalysisResults;
   const isLoading = analysisId ? isLoadingShared : contextIsLoading;
   const error = analysisId ? errorLoadingShared : contextError;
@@ -378,14 +381,15 @@ const ResultsPage = () => {
     toast.info("Salvando análise e gerando link...");
 
     // Prepare data payload - select ONLY non-sensitive fields from context results
-    // Ensure the fields match the AnalysisResultsToSave interface
+    // Ensure the fields match the EXPANDED AnalysisResultsToSave interface
     const dataToSave: Omit<AnalysisResultsToSave, 'createdAt'> = {
+        // Existing fields
         totalMessages: contextAnalysisResults.totalMessages,
         messagesPerSender: contextAnalysisResults.messagesPerSender,
         emojiCounts: contextAnalysisResults.emojiCounts,
         mostFrequentEmoji: contextAnalysisResults.mostFrequentEmoji,
-        // Explicitly map required keyword counts
-        keywordCounts: {
+        mostFrequentKeywordCategory: contextAnalysisResults.mostFrequentKeywordCategory, // Added this field
+        keywordCounts: { // Ensure all relevant categories are included if more exist
             laughter: contextAnalysisResults.keywordCounts['laughter'] ?? 0,
             questions: contextAnalysisResults.keywordCounts['questions'] ?? 0,
             positive: contextAnalysisResults.keywordCounts['positive'] ?? 0,
@@ -396,12 +400,33 @@ const ResultsPage = () => {
         punctuationEmphasisCount: contextAnalysisResults.punctuationEmphasisCount,
         capsWordCount: contextAnalysisResults.capsWordCount,
         topExpressions: contextAnalysisResults.topExpressions,
-        // Ensure statsPerSender matches the expected structure
+        passiveAggressivePercentage: contextAnalysisResults.passiveAggressivePercentage,
+        flirtationPercentage: contextAnalysisResults.flirtationPercentage,
+        aiPrediction: aiPrediction, // Assuming these come from context or state
+        aiPoem: aiPoem, // Assuming these come from context or state
+        aiStyleAnalysis: aiStyleAnalysis, // Assuming these come from context or state
+        generatedSign: calculatedSign, // Use the calculated sign from useMemo
+        isPremiumAnalysis: isPremium, // Use actual premium status from context
+        totalRedFlags: contextAnalysisResults.totalRedFlags,
+        totalGreenFlags: contextAnalysisResults.totalGreenFlags,
+        aiFlagPersonalityAnalysis: aiFlagPersonalityAnalysis, // Get from context state directly
+
+        // Newly added fields for the perfect mirror
+        peakHours: contextAnalysisResults.peakHours, // Assuming this exists on FullAnalysisResults
+        mostActiveHour: contextAnalysisResults.mostActiveHour, // Assuming this exists on FullAnalysisResults
+        totalMessageLength: contextAnalysisResults.totalMessageLength, // Assuming this exists on FullAnalysisResults
+        wordCounts: contextAnalysisResults.wordCounts, // Assuming this exists on FullAnalysisResults
+        expressionCounts: contextAnalysisResults.expressionCounts, // Assuming this exists on FullAnalysisResults
+        averageResponseTimesMinutes: contextAnalysisResults.averageResponseTimesMinutes, // Assuming this exists on FullAnalysisResults
+        messagesPerDayOfWeek: contextAnalysisResults.messagesPerDayOfWeek, // Assuming this exists on FullAnalysisResults
+        messagesPerDate: contextAnalysisResults.messagesPerDate, // Assuming this exists on FullAnalysisResults
+
+        // Ensure statsPerSender includes ALL fields from the expanded interface with correct keywordCounts structure
         statsPerSender: Object.entries(contextAnalysisResults.statsPerSender).reduce((acc, [sender, stats]) => {
-            // Explicitly pick fields and map keywordCounts for each sender
-            // Use the specific type from AnalysisResultsToSave['statsPerSender'][string]
+            // Explicitly map fields to match AnalysisResultsToSave['statsPerSender'][string]
             const senderData: AnalysisResultsToSave['statsPerSender'][string] = {
                 messageCount: stats.messageCount,
+                totalLength: stats.totalLength,
                 averageLength: stats.averageLength,
                 emojiCounts: stats.emojiCounts,
                 keywordCounts: { // Explicitly map required keyword counts
@@ -409,27 +434,29 @@ const ResultsPage = () => {
                     questions: stats.keywordCounts['questions'] ?? 0,
                     positive: stats.keywordCounts['positive'] ?? 0,
                     negative: stats.keywordCounts['negative'] ?? 0,
+                    // Add other categories here if needed, matching the backend interface
                 },
+                punctuationEmphasisCount: stats.punctuationEmphasisCount,
+                capsWordCount: stats.capsWordCount,
+                totalResponseTimeMs: stats.totalResponseTimeMs,
+                responseCount: stats.responseCount,
+                averageResponseTimeMinutes: stats.averageResponseTimeMinutes,
+                passiveAggressiveCount: stats.passiveAggressiveCount,
+                flirtationCount: stats.flirtationCount,
                 passiveAggressivePercentage: stats.passiveAggressivePercentage,
                 flirtationPercentage: stats.flirtationPercentage,
-                // averageResponseTimeMinutes: stats.averageResponseTimeMinutes, // Uncomment if saving this
+                redFlagCount: stats.redFlagCount,
+                greenFlagCount: stats.greenFlagCount,
+                redFlagKeywords: stats.redFlagKeywords,
+                greenFlagKeywords: stats.greenFlagKeywords,
             };
             acc[sender] = senderData;
             return acc;
-        }, {} as AnalysisResultsToSave['statsPerSender']), // Use the specific type from AnalysisResultsToSave
-        passiveAggressivePercentage: contextAnalysisResults.passiveAggressivePercentage,
-        flirtationPercentage: contextAnalysisResults.flirtationPercentage,
-        aiPrediction: aiPrediction,
-        aiPoem: aiPoem,
-        aiStyleAnalysis: aiStyleAnalysis,
-        generatedSign: calculatedSign, // SAVE the calculated sign
-        isPremiumAnalysis: isPremiumMock, // Save the premium status flag
-        // Add flag counts to save data
-        totalRedFlags: contextAnalysisResults.totalRedFlags,
-        totalGreenFlags: contextAnalysisResults.totalGreenFlags,
-        // Add placeholder for the new AI analysis (will be generated in PremiumPage)
-        aiFlagPersonalityAnalysis: null,
+        }, {} as AnalysisResultsToSave['statsPerSender']),
     };
+
+    // Optional: Add validation here to ensure all required fields are present in dataToSave, especially the newly added ones
+    // e.g., if (!dataToSave.peakHours) { console.warn("Missing peakHours in dataToSave"); /* handle potentially */ }
 
     try {
         const result = await saveAnalysisFunction(dataToSave);
@@ -625,11 +652,13 @@ const ResultsPage = () => {
           </div>
         )}
 
-        {/* Activity Card */}
-        {isFullAnalysisResults(analysisResults) && !analysisId && (
+        {/* Activity Card - Now shows for shared links too if data exists */}
+        {/* Check if the necessary data exists directly on analysisResults */}
+        {(analysisResults?.messagesPerDate || analysisResults?.messagesPerDayOfWeek) && (
           <motion.div variants={cardVariants}>
             <ResultCard title="Atividade do Chat" variant="default">
               <div className="space-y-4">
+                {/* Keep ToggleGroup, it doesn't depend on !analysisId */}
                 <div className="flex justify-center mb-4">
                 <ToggleGroup type="single" value={selectedChartView} onValueChange={(value) => value && setSelectedChartView(value as any)}>
                   <ToggleGroupItem value="daily" aria-label="Daily View" className="flex gap-1 items-center">
@@ -640,17 +669,22 @@ const ResultsPage = () => {
                   </ToggleGroupItem>
                 </ToggleGroup>
               </div>
-              {selectedChartView === 'daily' && analysisResults.messagesPerDate && (
+              {/* Use optional chaining and check existence */}
+              {selectedChartView === 'daily' && analysisResults?.messagesPerDate && (
                 <TimelineChart
                   data={Object.entries(analysisResults.messagesPerDate).map(([date, count]) => ({ name: date, value: count }))}
                   viewType="daily"
                 />
               )}
-              {selectedChartView === 'weekly' && analysisResults.messagesPerDayOfWeek && (
+              {selectedChartView === 'weekly' && analysisResults?.messagesPerDayOfWeek && (
                  <TimelineChart
                    data={Object.entries(analysisResults.messagesPerDayOfWeek).map(([dayIndex, count]) => ({ name: dayIndex, value: count }))}
                    viewType="weekly"
                  />
+              )}
+              {/* Add a fallback if neither chart has data */}
+              {!analysisResults?.messagesPerDate && !analysisResults?.messagesPerDayOfWeek && (
+                <p className="text-sm opacity-70 text-center">Dados de atividade não disponíveis.</p>
                 )}
               </div>
             </ResultCard>
@@ -661,13 +695,32 @@ const ResultsPage = () => {
         <motion.div variants={cardVariants}>
           <ResultCard title="Visão Geral do Chat" variant="default">
              <div className="space-y-3">
-               <div className="flex justify-between items-center"><span className="font-medium flex items-center"><MessageSquareText className="w-4 h-4 mr-2 opacity-70"/>Total de Mensagens:</span><span className="font-bold text-lg">{analysisResults.totalMessages ?? 'N/A'}</span></div>
+             <div className="flex justify-between items-center"><span className="font-medium flex items-center"><MessageSquareText className="w-4 h-4 mr-2 opacity-70"/>Total de Mensagens:</span><span className="font-bold text-lg">{analysisResults.totalMessages ?? 'N/A'}</span></div>
              <div className="flex justify-between items-center"><span className="font-medium flex items-center"><Text className="w-4 h-4 mr-2 opacity-70"/>Tamanho Médio:</span><span className="font-bold text-lg">{analysisResults.averageMessageLength?.toFixed(0) ?? 'N/A'} <span className="text-xs opacity-70">caracteres</span></span></div>
-             {isFullAnalysisResults(analysisResults) && analysisResults.mostFrequentKeywordCategory === 'laughter' && (<p className="text-sm opacity-80 pt-1 flex items-center"><Laugh className="w-4 h-4 mr-1 text-yellow-500"/> Clima geral: Descontraído</p>)}
-             {isFullAnalysisResults(analysisResults) && analysisResults.mostFrequentKeywordCategory === 'questions' && (<p className="text-sm opacity-80 pt-1 flex items-center"><QuestionIcon className="w-4 h-4 mr-1 text-blue-500"/> Clima geral: Investigativo</p>)}
+             {/* Check for keyword category directly */}
+             {analysisResults?.mostFrequentKeywordCategory === 'laughter' && (<p className="text-sm opacity-80 pt-1 flex items-center"><Laugh className="w-4 h-4 mr-1 text-yellow-500"/> Clima geral: Descontraído</p>)}
+             {analysisResults?.mostFrequentKeywordCategory === 'questions' && (<p className="text-sm opacity-80 pt-1 flex items-center"><QuestionIcon className="w-4 h-4 mr-1 text-blue-500"/> Clima geral: Investigativo</p>)}
              </div>
           </ResultCard>
         </motion.div>
+
+        {/* Banner AdSense */}
+        {!analysisId && !isPremium && (
+          <div className="my-6 flex justify-center">
+            <div className="max-w-full">
+              <AdBanner slot="1234567890" />
+            </div>
+          </div>
+        )}
+
+        {/* Banner extra após Participantes */}
+        {!analysisId && (
+          <div className="my-6 flex justify-center">
+            <div className="max-w-full">
+              <AdBanner slot="slot1" />
+            </div>
+          </div>
+        )}
 
         {/* Per-Sender Analysis */}
         {analysisResults.statsPerSender && Object.keys(analysisResults.statsPerSender).length > 1 && (
@@ -677,11 +730,11 @@ const ResultsPage = () => {
                 {Object.entries(analysisResults.statsPerSender)
                 .sort(([, statsA], [, statsB]) => (statsB?.messageCount ?? 0) - (statsA?.messageCount ?? 0))
                 .map(([sender, stats]) => {
-                  const safeStats = stats || {};
-                  // Ensure keywordCounts exists before calculating ratio
-                  const senderSentimentRatio = (safeStats.keywordCounts?.positive ?? 0) / ((safeStats.keywordCounts?.negative ?? 0) + 1);
-                  const topSenderEmoji = findTopItem(safeStats.emojiCounts);
-                  const topSenderKeywordCat = findTopItem(safeStats.keywordCounts);
+                  // REMOVED: const safeStats = stats || {};
+                  // Use optional chaining directly on 'stats'
+                  const senderSentimentRatio = (stats?.keywordCounts?.positive ?? 0) / ((stats?.keywordCounts?.negative ?? 0) + 1);
+                  const topSenderEmoji = findTopItem(stats?.emojiCounts);
+                  const topSenderKeywordCat = findTopItem(stats?.keywordCounts);
 
                   return (
                     <div
@@ -690,15 +743,16 @@ const ResultsPage = () => {
                       onClick={() => !analysisId && handleSenderClick(sender)}
                     >
                       <h4 className="font-semibold mb-1 flex items-center"><UserCircle className="w-4 h-4 mr-2 opacity-70"/>{sender}</h4>
+                      {/* Use optional chaining ?. for all accesses to stats properties */}
                       <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs opacity-80">
-                        <span>{safeStats.messageCount ?? 0} msg{(safeStats.messageCount ?? 0) > 1 ? 's' : ''}</span>
-                        <span>Média: {safeStats.averageLength?.toFixed(0) ?? 'N/A'} chars</span>
+                        <span>{stats?.messageCount ?? 0} msg{(stats?.messageCount ?? 0) > 1 ? 's' : ''}</span>
+                        <span>Média: {stats?.averageLength?.toFixed(0) ?? 'N/A'} chars</span>
                         {topSenderEmoji && <span className="truncate flex items-center"><Smile className="w-3.5 h-3.5 mr-1"/> {topSenderEmoji}</span>}
                         {topSenderKeywordCat && <span className="truncate flex items-center"><Zap className="w-3.5 h-3.5 mr-1"/> {formatKeywordCategory(topSenderKeywordCat)}</span>}
                         {/* Check for averageResponseTimeMinutes specifically */}
-                        {safeStats.averageResponseTimeMinutes !== undefined && safeStats.averageResponseTimeMinutes !== null ? (
-                          <span className="truncate flex items-center"><Clock1 className="w-3.5 h-3.5 mr-1"/> Resposta: {safeStats.averageResponseTimeMinutes} min</span>
-                        ) : !analysisId ? (
+                        {stats?.averageResponseTimeMinutes !== undefined && stats?.averageResponseTimeMinutes !== null ? (
+                          <span className="truncate flex items-center"><Clock1 className="w-3.5 h-3.5 mr-1"/> Resposta: {stats.averageResponseTimeMinutes} min</span>
+                        ) : !analysisId ? ( // Only show "Sem respostas" if it's the local view
                           <span className="truncate flex items-center text-gray-400"><Clock1 className="w-3.5 h-3.5 mr-1"/> Sem respostas</span>
                         ) : null}
                         <span className="col-span-2 sm:col-span-1">
@@ -707,8 +761,8 @@ const ResultsPage = () => {
                         {/* Show premium stats if the analysis was saved as premium OR if premium mock is active */}
                         {(loadedResults?.isPremiumAnalysis || (!analysisId && isPremiumMock)) && (
                           <>
-                            <span className="truncate flex items-center text-yellow-400"><Users className="w-3.5 h-3.5 mr-1"/> P.A.: {safeStats.passiveAggressivePercentage?.toFixed(1) ?? '0.0'}%</span>
-                            <span className="truncate flex items-center text-pink-200"><Smile className="w-3.5 h-3.5 mr-1"/> Flerte: {safeStats.flirtationPercentage?.toFixed(1) ?? '0.0'}%</span>
+                            <span className="truncate flex items-center text-yellow-400"><Users className="w-3.5 h-3.5 mr-1"/> P.A.: {stats?.passiveAggressivePercentage?.toFixed(1) ?? '0.0'}%</span>
+                            <span className="truncate flex items-center text-pink-200"><Smile className="w-3.5 h-3.5 mr-1"/> Flerte: {stats?.flirtationPercentage?.toFixed(1) ?? '0.0'}%</span>
                           </>
                         )}
                       </div>
@@ -875,8 +929,21 @@ const ResultsPage = () => {
           <ResultCard title="Destaques do Chat" variant="primary">
             <div className="space-y-4">
               {analysisResults.mostFrequentEmoji ? (<> <div className="flex justify-between items-center"><span className="font-medium">Emoji Principal:</span><span className="text-4xl">{analysisResults.mostFrequentEmoji}</span></div> <p className="text-sm">Seu espírito animal digital é o {analysisResults.mostFrequentEmoji}!</p> </>) : (<p className="text-sm opacity-70">Nenhum emoji frequente encontrado.</p>)}
-            {/* Most Active Hour might not be saved, handle this */}
-            {isFullAnalysisResults(analysisResults) && analysisResults.mostActiveHour !== undefined && analysisResults.mostActiveHour !== null ? (<> <div className="flex items-center"><Clock className="h-5 w-5 mr-2" /><span className="font-medium">Horário Nobre: </span><span className="ml-2 bg-white/30 px-2 py-0.5 rounded font-bold">{`${analysisResults.mostActiveHour.toString().padStart(2, '0')}:00 - ${(analysisResults.mostActiveHour + 1).toString().padStart(2, '0')}:00`}</span></div> <p className="text-sm">Sua energia de chat bomba entre <strong>{analysisResults.mostActiveHour}:00</strong> e <strong>{(analysisResults.mostActiveHour + 1)}:00</strong>.</p> </>) : analysisId ? null : (<p className="text-sm opacity-70">Não foi possível determinar o horário nobre.</p>)}
+            {/* Most Active Hour - Check directly if it exists */}
+            {analysisResults?.mostActiveHour !== undefined && analysisResults?.mostActiveHour !== null ? (
+              <>
+                <div className="flex items-center">
+                  <Clock className="h-5 w-5 mr-2" />
+                  <span className="font-medium">Horário Nobre: </span>
+                  <span className="ml-2 bg-white/30 px-2 py-0.5 rounded font-bold">
+                    {`${analysisResults.mostActiveHour.toString().padStart(2, '0')}:00 - ${(analysisResults.mostActiveHour + 1).toString().padStart(2, '0')}:00`}
+                  </span>
+                </div>
+                <p className="text-sm">Sua energia de chat bomba entre <strong>{analysisResults.mostActiveHour}:00</strong> e <strong>{(analysisResults.mostActiveHour + 1)}:00</strong>.</p>
+              </>
+            ) : (
+              <p className="text-sm opacity-70">Não foi possível determinar o horário nobre.</p>
+            )}
               {analysisResults.favoriteWord ? (<div className="flex justify-between items-center pt-2"><span className="font-medium">Palavra Favorita:</span><span className="bg-white/30 px-3 py-1 rounded-full font-bold">{analysisResults.favoriteWord}</span></div>) : (<div className="flex justify-between items-center pt-2"><span className="font-medium">Palavra Favorita:</span><span className="text-sm opacity-70">Nenhuma palavra marcante encontrada.</span></div>)}
             </div>
           </ResultCard>
@@ -1023,21 +1090,16 @@ const ResultsPage = () => {
            <Button variant="outline" size="sm" className="border-white/30 bg-white/10 text-sm">Ver Tutorial</Button>
         </div>
         {/* Share Button (Always show?) */}
-         {/* Action buttons are not cards, keep outside stagger */}
-         <div className="mt-8 mb-4">
-            {/* Premium Upsell Button (Hide if shared link or already premium) */}
-            {!analysisId && !isPremiumMock && (
-              <Button onClick={handlePremiumClick} className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-white font-semibold py-4 rounded-xl shadow-lg">Desbloqueie Análises Premium ✨</Button>
-            )}
-         </div>
-         <div className="flex justify-center space-x-4 mb-16">
-           {/* Analyze Another Button (Always show?) */}
-           <Button onClick={handleAnalyzeAnother} variant="outline" size="sm" className="border-white/30 bg-white/10 text-sm">Analisar Outro Chat</Button>
-           {/* Tutorial Button (Always show?) */}
-           <Button variant="outline" size="sm" className="border-white/30 bg-white/10 text-sm">Ver Tutorial</Button>
-        </div>
-        {/* Share Button (Always show?) */}
         <ShareButton onClick={handleShare} />
+
+        {/* Banner extra no final da página */}
+        {!analysisId && (
+          <div className="my-6 flex justify-center">
+            <div className="max-w-full">
+              <AdBanner slot="slot2" />
+            </div>
+          </div>
+        )}
       </motion.div> {/* End of container motion.div */}
 
       {/* Sender Focus Modal (Hide if shared link) - Keep outside main animation flow */}

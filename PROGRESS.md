@@ -124,5 +124,14 @@ Create a functional web application that analyzes uploaded WhatsApp chat `.txt` 
 *   [X] Add explicit user consent flow (checkbox) for sending data to AI APIs on Premium Page (`PremiumPage.tsx`).
 *   Add tutorial/onboarding overlays to guide users through the application.
 
+## Monetização Mobile (AdMob)
+
+* Integrar o **Google AdMob** na versão mobile (PWA ou app nativo).
+* Utilizar **anúncios intersticiais** (tela cheia entre navegações) para maximizar receita.
+* Utilizar **anúncios recompensados** (rewarded ads) para liberar funcionalidades extras ou análises completas após o usuário assistir um vídeo publicitário.
+* Seguir as **políticas do Google** para não violar regras e evitar banimento.
+* Planejar a integração com SDKs do AdMob para React Native, Capacitor, Cordova ou outro framework mobile.
+* Explorar o uso combinado com banners do AdSense na versão web.
+
 ---
 *This file will be updated as development progresses.*

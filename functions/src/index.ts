@@ -253,40 +253,63 @@ export const callGemini = functions.https.onCall(async (data: unknown, context) 
 
 
 // --- Function to Save Analysis Results ---
-// Interface remains the same
+// Interface expanded to match frontend more closely for a perfect mirror
 export interface AnalysisResultsToSave {
   totalMessages: number;
-  messagesPerSender: Record<string, number>;
-  emojiCounts: Record<string, number>;
+  messagesPerSender: Record<string, number>; // Simple count per sender
+  emojiCounts: Record<string, number>; // Overall emoji counts
   mostFrequentEmoji: string | null;
+  mostFrequentKeywordCategory: string | null; // Added: Category with most keywords
+  peakHours: Record<number, number>; // Added: Messages per hour (0-23)
+  mostActiveHour: number | null; // Added: Hour with most messages
   keywordCounts: {
     laughter: number;
     questions: number;
     positive: number;
     negative: number;
+    // Add other categories if they exist in the frontend analysis
   };
   averageMessageLength: number;
-  favoriteWord: string | null;
-  punctuationEmphasisCount: number;
-  capsWordCount: number;
-  topExpressions: { text: string; count: number }[];
-  statsPerSender: Record<string, {
+  totalMessageLength: number; // Added: Total characters for consistency if needed elsewhere
+  favoriteWord: string | null; // Most frequent significant word
+  wordCounts: Record<string, number>; // Added: Counts for significant words (can be large)
+  expressionCounts: Record<string, number>; // Added: Counts for common expressions (bigrams)
+  punctuationEmphasisCount: number; // Overall count of !!! or ???
+  capsWordCount: number; // Overall count of CAPS words
+  topExpressions: { text: string; count: number }[]; // Top N expressions
+  averageResponseTimesMinutes: Record<string, number | null>; // Added: Avg response time per sender
+  messagesPerDayOfWeek: Record<number, number>; // Added: Messages per day of week (0=Sun)
+  messagesPerDate: Record<string, number>; // Added: Messages per date ('YYYY-MM-DD')
+  statsPerSender: Record<string, { // Detailed stats per sender
     messageCount: number;
+    totalLength: number; // Added: Total characters sent by sender
     averageLength: number;
-    emojiCounts: Record<string, number>;
+    emojiCounts: Record<string, number>; // Emojis used by sender
     keywordCounts: {
       laughter: number;
       questions: number;
       positive: number;
       negative: number;
+      // Add other categories if they exist in the frontend analysis
     };
+    punctuationEmphasisCount: number; // Added: Emphasis count per sender
+    capsWordCount: number; // Added: CAPS count per sender
+    totalResponseTimeMs: number; // Added: Sum of response times in ms
+    responseCount: number; // Added: Number of responses tracked
+    averageResponseTimeMinutes: number | null; // Added: Average response time in minutes
+    passiveAggressiveCount: number; // Added: Raw count
+    flirtationCount: number; // Added: Raw count
     passiveAggressivePercentage: number | null;
     flirtationPercentage: number | null;
-    redFlagKeywords?: string[];
-    greenFlagKeywords?: string[];
+    redFlagCount: number; // Added: Raw count
+    greenFlagCount: number; // Added: Raw count
+    redFlagKeywords: string[]; // Added: Store actual matched keywords/phrases
+    greenFlagKeywords: string[]; // Added: Store actual matched keywords/phrases
   }>;
+  // Overall Premium Percentages (calculated from counts)
   passiveAggressivePercentage: number | null;
   flirtationPercentage: number | null;
+  // Overall AI results
   aiPrediction: string | null;
   aiPoem: string | null;
   aiStyleAnalysis: string | null;
@@ -317,6 +340,7 @@ export const saveAnalysisResults = functions.https.onCall(async (data: unknown, 
   if (typeof receivedData.messagesPerSender === 'object' && receivedData.messagesPerSender !== null) dataToSave.messagesPerSender = receivedData.messagesPerSender;
   if (typeof receivedData.emojiCounts === 'object' && receivedData.emojiCounts !== null) dataToSave.emojiCounts = receivedData.emojiCounts;
   if (typeof receivedData.mostFrequentEmoji === 'string' || receivedData.mostFrequentEmoji === null) dataToSave.mostFrequentEmoji = receivedData.mostFrequentEmoji;
+  if (typeof receivedData.mostFrequentKeywordCategory === 'string' || receivedData.mostFrequentKeywordCategory === null) dataToSave.mostFrequentKeywordCategory = receivedData.mostFrequentKeywordCategory; // Added mapping
   if (typeof receivedData.keywordCounts === 'object' && receivedData.keywordCounts !== null) dataToSave.keywordCounts = receivedData.keywordCounts;
   if (typeof receivedData.averageMessageLength === 'number') dataToSave.averageMessageLength = receivedData.averageMessageLength;
   if (typeof receivedData.favoriteWord === 'string' || receivedData.favoriteWord === null) dataToSave.favoriteWord = receivedData.favoriteWord;
