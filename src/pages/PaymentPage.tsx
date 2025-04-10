@@ -140,10 +140,12 @@ const [identificationNumber, setIdentificationNumber] = useState<string>("");
       // If switching to Pix, unmount any existing cardForm
       if (window._mpCardFormInstance && typeof window._mpCardFormInstance.unmount === "function") {
         try {
-          console.log("Desmontando cardForm porque método mudou para Pix");
-          window._mpCardFormInstance.unmount();
+          if (window._mpCardFormInstance && typeof window._mpCardFormInstance.unmount === "function") {
+            console.log("Desmontando cardForm porque método mudou para Pix");
+            window._mpCardFormInstance.unmount();
+          }
         } catch (err) {
-          console.error("Erro ao desmontar cardForm ao mudar para Pix:", err);
+          console.warn("CardForm não estava montado ao tentar desmontar (Pix):", err);
         }
       }
       return;
@@ -152,9 +154,13 @@ const [identificationNumber, setIdentificationNumber] = useState<string>("");
     let cardFormInstance: any = null;
 
     try {
-      if (window._mpCardFormInstance && typeof window._mpCardFormInstance.unmount === "function") {
-        console.log("Desmontando cardForm anterior...");
-        window._mpCardFormInstance.unmount();
+      try {
+        if (window._mpCardFormInstance && typeof window._mpCardFormInstance.unmount === "function") {
+          console.log("Desmontando cardForm anterior...");
+          window._mpCardFormInstance.unmount();
+        }
+      } catch (err) {
+        console.warn("CardForm não estava montado ao tentar desmontar:", err);
       }
 
       // Adiciona verificação para garantir que o container do formulário existe
