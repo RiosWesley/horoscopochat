@@ -104,13 +104,15 @@ const RenderCompatibility: React.FC<RenderCompatibilityProps> = ({ analysisResul
 const PremiumPage: React.FC = () => {
   const {
     parsedMessages,
+    setParsedMessages,
+    analysisResults,
+    setAnalysisResults,
     aiPrediction,
     setAiPrediction,
     aiPoem,
     setAiPoem,
     aiStyleAnalysis,
     setAiStyleAnalysis,
-    analysisResults,
     generatedSign,
     selectedSender,
     aiFlagPersonalityAnalysis,
@@ -157,6 +159,42 @@ const PremiumPage: React.FC = () => {
           if (data.aiPoem) setAiPoem(data.aiPoem);
           if (data.aiStyleAnalysis) setAiStyleAnalysis(data.aiStyleAnalysis);
           if (data.aiFlagPersonalityAnalysis) setAiFlagPersonalityAnalysis(data.aiFlagPersonalityAnalysis);
+
+          // Restaurar parsedMessages do Firestore se o contexto estiver vazio
+          if ((!parsedMessages || parsedMessages.length === 0) && data.parsedMessages) {
+            setParsedMessages(data.parsedMessages);
+          }
+
+          // Restaurar analysisResults do Firestore se o contexto estiver vazio
+          if (!analysisResults && data.keywordCounts && data.statsPerSender) {
+            setAnalysisResults({
+              keywordCounts: data.keywordCounts ?? {},
+              mostFrequentEmoji: data.mostFrequentEmoji ?? '',
+              favoriteWord: data.favoriteWord ?? '',
+              statsPerSender: data.statsPerSender ?? {},
+              totalRedFlags: data.totalRedFlags ?? 0,
+              totalGreenFlags: data.totalGreenFlags ?? 0,
+              passiveAggressivePercentage: data.passiveAggressivePercentage ?? 0,
+              flirtationPercentage: data.flirtationPercentage ?? 0,
+              totalMessages: data.totalMessages ?? 0,
+              messagesPerSender: data.messagesPerSender ?? {},
+              emojiCounts: data.emojiCounts ?? {},
+              peakHours: data.peakHours ?? {},
+              messagesPerDate: data.messagesPerDate ?? {},
+              messagesPerDayOfWeek: data.messagesPerDayOfWeek ?? {},
+              averageMessageLength: data.averageMessageLength ?? 0,
+              averageResponseTimesMinutes: data.averageResponseTimesMinutes ?? {},
+              capsWordCount: data.capsWordCount ?? 0,
+              punctuationEmphasisCount: data.punctuationEmphasisCount ?? 0,
+              mostFrequentKeywordCategory: data.mostFrequentKeywordCategory ?? '',
+              mostActiveHour: data.mostActiveHour ?? 0,
+              totalMessageLength: data.totalMessageLength ?? 0,
+              wordCounts: data.wordCounts ?? {},
+              expressionCounts: data.expressionCounts ?? {},
+              topExpressions: data.topExpressions ?? [],
+              punctuationCounts: data.punctuationCounts ?? {},
+            });
+          }
         } else {
           console.error('Análise não encontrada no Firestore');
         }
@@ -166,17 +204,12 @@ const PremiumPage: React.FC = () => {
     };
 
     fetchAnalysis();
-  }, [analysisId, analysisResults, setAiPrediction, setAiPoem, setAiStyleAnalysis, setAiFlagPersonalityAnalysis]);
+  }, [analysisId, analysisResults, parsedMessages, setParsedMessages, setAnalysisResults, setAiPrediction, setAiPoem, setAiStyleAnalysis, setAiFlagPersonalityAnalysis]);
 
   const callAIFeature = useCallback(async (featureType: AiFeatureType) => {
     const now = Date.now();
     const lastCallTime = lastCallTimestamps[featureType] || 0;
 
-    // Consent Check
-    if (!aiConsentGiven) {
-      toast.error("Por favor, marque a caixa de consentimento para usar as funções de IA.");
-      return;
-    }
 
     // Per-Feature Rate Limiting Check
     if (now - lastCallTime < MIN_INTERVAL_MS) {
@@ -398,7 +431,7 @@ const PremiumPage: React.FC = () => {
               <Card className="bg-white p-4">
                 <CardHeader className="p-0 pb-2 flex flex-row items-center justify-between">
                    <CardTitle className="text-lg text-indigo-700 flex items-center"><Sparkles className="w-5 h-5 mr-2 text-yellow-500"/> Previsão do Chat (IA)</CardTitle>
-                   <Button size="sm" onClick={() => callAIFeature('prediction')} disabled={!aiConsentGiven || isPredictionLoading || isPoemLoading || isStyleLoading || isFlagPersonalityLoading}>
+                   <Button size="sm" onClick={() => callAIFeature('prediction')}>
                      {isPredictionLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4"/>}
                      Gerar
                    </Button>
@@ -418,7 +451,7 @@ const PremiumPage: React.FC = () => {
               <Card className="bg-white p-4">
                  <CardHeader className="p-0 pb-2 flex flex-row items-center justify-between">
                    <CardTitle className="text-lg text-indigo-700 flex items-center"><Feather className="w-5 h-5 mr-2 text-blue-500"/> Poema do Chat (IA)</CardTitle>
-                   <Button size="sm" onClick={() => callAIFeature('poem')} disabled={!aiConsentGiven || isPredictionLoading || isPoemLoading || isStyleLoading || isFlagPersonalityLoading}>
+                   <Button size="sm" onClick={() => callAIFeature('poem')}>
                      {isPoemLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Feather className="mr-2 h-4 w-4"/>}
                      Gerar
                    </Button>
@@ -438,7 +471,7 @@ const PremiumPage: React.FC = () => {
               <Card className="bg-white p-4">
                  <CardHeader className="p-0 pb-2 flex flex-row items-center justify-between">
                    <CardTitle className="text-lg text-indigo-700 flex items-center"><BrainCircuit className="w-5 h-5 mr-2 text-green-500"/> Estilo de Comunicação (IA)</CardTitle>
-                    <Button size="sm" onClick={() => callAIFeature('style')} disabled={!aiConsentGiven || isPredictionLoading || isPoemLoading || isStyleLoading || isFlagPersonalityLoading}>
+                    <Button size="sm" onClick={() => callAIFeature('style')}>
                       {isStyleLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BrainCircuit className="mr-2 h-4 w-4"/>}
                       Analisar
                     </Button>
@@ -608,7 +641,7 @@ const PremiumPage: React.FC = () => {
                  <CardHeader className="p-0 pb-2 flex flex-row items-center justify-between">
                    <CardTitle className="text-lg text-indigo-700 flex items-center"><UserCheck className="w-5 h-5 mr-2 text-teal-600"/> Personalidade por Sinais (IA)</CardTitle>
                    {/* Ensure callAIFeature type includes 'flagPersonality' */}
-                   <Button size="sm" onClick={() => callAIFeature('flagPersonality')} disabled={!aiConsentGiven || isPredictionLoading || isPoemLoading || isStyleLoading || isFlagPersonalityLoading}>
+                   <Button size="sm" onClick={() => callAIFeature('flagPersonality')}>
                      {isFlagPersonalityLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BrainCircuit className="mr-2 h-4 w-4"/>}
                      Analisar Flags
                    </Button>
