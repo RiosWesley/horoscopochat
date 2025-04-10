@@ -1,6 +1,9 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
+import { createPayment } from "./createPayment";
+export { createPayment };
+ 
 
 // Initialize Firebase Admin SDK (only once)
 if (admin.apps.length === 0) {
@@ -144,6 +147,7 @@ export const callGemini = functions.https.onCall(async (data: unknown, context) 
           Dados por Participante:
           ${flagPromptParts.join("\n\n")}
           Com base EXCLUSIVAMENTE nessas palavras/frases fornecidas para cada pessoa, gere uma breve análise de personalidade (1-2 frases) para CADA participante listado. Foque em traços que podem ser inferidos a partir das flags (ex: direto, cuidadoso, impaciente, encorajador, etc.).
+
           Seja conciso e direto ao ponto.
           Retorne a análise como um objeto JSON onde as chaves são os nomes dos participantes e os valores são as strings da análise de personalidade correspondente.
           Exemplo de formato de saída esperado:

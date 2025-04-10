@@ -41,6 +41,14 @@ declare global {
   }
 }
 
+function getPaymentFunctionUrl() {
+  const projectId = "horoscopozap"; // seu projectId do Firebase
+  const isLocalhost = window.location.hostname === "localhost";
+    return `https://us-central1-horoscopozap.cloudfunctions.net/createPayment`;
+  
+}
+
+
 const PaymentPage = () => {
   const { analysisId: routeId } = useParams<{ analysisId: string }>();
   const navigate = useNavigate();
@@ -200,14 +208,55 @@ const [identificationNumber, setIdentificationNumber] = useState<string>("");
                 throw new Error("Não foi possível obter os dados do formulário do cartão.");
               }
               console.log("Dados do CardForm:", cardData);
-              console.log("Simulando processamento de pagamento com cartão...");
-              await new Promise(resolve => setTimeout(resolve, 2000));
-              console.log("Simulação de pagamento com cartão concluída.");
+              console.log("Enviando dados para Cloud Function create-payment...");
+
               try {
-                const db = getFirestore();
-                const analysisRef = doc(db, 'sharedAnalyses', analysisId!);
-                await updateDoc(analysisRef, { isPremiumAnalysis: true });
-                console.log("Campo isPremiumAnalysis atualizado para true no Firestore.");
+                const response = await fetch(getPaymentFunctionUrl(), {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json"
+                  },
+                  body: JSON.stringify({
+                    token: cardData.token,
+                    payment_method_id: cardData.paymentMethodId,
+                    issuer_id: cardData.issuerId,
+                    email: cardData.email,
+                    identificationType,
+                    identificationNumber,
+                    transaction_amount: premiumPrice,
+                    installments: 1,
+                    description: "Pagamento Premium",
+                    analysisId
+                  })
+                });
+
+                const result = await response.json();
+                console.log("Resposta da Cloud Function:", result);
+
+                if (result.success) {
+                  toast({
+                    title: "Pagamento aprovado!",
+                    description: "Seu acesso premium foi liberado.",
+                    variant: "default"
+                  });
+                  navigate(`/results/${analysisId}`);
+                } else {
+                  toast({
+                    title: "Pagamento não aprovado",
+                    description: result.message || "Tente novamente ou use outro método.",
+                    variant: "destructive"
+                  });
+                }
+              } catch (error) {
+                console.error("Erro ao chamar Cloud Function:", error);
+                toast({
+                  title: "Erro no pagamento",
+                  description: "Não foi possível processar seu pagamento. Tente novamente.",
+                  variant: "destructive"
+                });
+              }
+              try {
+                // Atualização do status premium removida do frontend.
               } catch (error) {
                 console.error("Erro ao atualizar status premium no Firestore:", error);
                 toast({

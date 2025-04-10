@@ -33,10 +33,12 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getAnalysisResults = exports.saveAnalysisResults = exports.callGemini = void 0;
+exports.getAnalysisResults = exports.saveAnalysisResults = exports.callGemini = exports.createPayment = void 0;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const generative_ai_1 = require("@google/generative-ai");
+const createPayment_1 = require("./createPayment");
+Object.defineProperty(exports, "createPayment", { enumerable: true, get: function () { return createPayment_1.createPayment; } });
 // Initialize Firebase Admin SDK (only once)
 if (admin.apps.length === 0) {
     admin.initializeApp();
@@ -157,6 +159,7 @@ exports.callGemini = functions.https.onCall(async (data, context) => {
           Dados por Participante:
           ${flagPromptParts.join("\n\n")}
           Com base EXCLUSIVAMENTE nessas palavras/frases fornecidas para cada pessoa, gere uma breve análise de personalidade (1-2 frases) para CADA participante listado. Foque em traços que podem ser inferidos a partir das flags (ex: direto, cuidadoso, impaciente, encorajador, etc.).
+
           Seja conciso e direto ao ponto.
           Retorne a análise como um objeto JSON onde as chaves são os nomes dos participantes e os valores são as strings da análise de personalidade correspondente.
           Exemplo de formato de saída esperado:
