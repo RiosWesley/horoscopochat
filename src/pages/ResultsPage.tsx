@@ -525,6 +525,16 @@ const ResultsPage = () => {
     console.log("Payload que será enviado para o banco (dataToSave):", dataToSave);
 
     try {
+      // Limitar e anonimizar as últimas 500 mensagens do contexto
+      const limitedParsedMessages = (contextParsedMessages ?? []).slice(-500);
+      const anonymizedMessages = limitedParsedMessages.map(({ timestamp, sender, message, isSystemMessage }) => ({
+        timestamp,
+        sender,
+        message,
+        isSystemMessage
+      }));
+      (dataToSave as any).parsedMessages = anonymizedMessages;
+
       const result = await saveAnalysisFunction(dataToSave);
       const saveData = result.data as { success: boolean; analysisId?: string; message?: string };
 
