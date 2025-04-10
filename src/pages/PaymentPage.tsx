@@ -563,12 +563,6 @@ const [identificationNumber, setIdentificationNumber] = useState<string>("");
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="faq-2">
-              <AccordionTrigger>Posso solicitar reembolso?</AccordionTrigger>
-              <AccordionContent>
-                Sim. Caso não esteja satisfeito com os recursos premium, você pode solicitar reembolso integral em até 7 dias após a compra. Entre em contato conosco para solicitar.
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="faq-3">
               <AccordionTrigger>O acesso premium vale para sempre?</AccordionTrigger>
               <AccordionContent>
                 O acesso premium é vitalício, mas vinculado a esta análise específica. Se você iniciar uma nova análise, será necessário adquirir o premium novamente.

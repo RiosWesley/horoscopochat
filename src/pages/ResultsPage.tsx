@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react'; // Removed useCallback
 import { useNavigate, useParams } from 'react-router-dom';
 import html2canvas from 'html2canvas';
 import { motion } from 'framer-motion'; // Import motion
@@ -27,6 +27,12 @@ import type { AnalysisResults as FullAnalysisResults, SenderStats } from '../lib
 import type { ParsedMessage } from '../lib/parseChat';
 // Import the exported type from functions - Adjust path if build process changes it
 import type { AnalysisResultsToSave } from '../../functions/src/index';
+
+// Extensão da interface para incluir campos extras que o backend salva
+interface AnalysisResultsToSaveExtended extends AnalysisResultsToSave {
+  generatedSignoDescription: string | null;
+  generatedFunFacts: string[];
+}
 
 // Initialize Firebase Functions for saving/loading
 const functions = getFunctions(firebaseApp);
@@ -75,7 +81,7 @@ const ResultsPage = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [sharedLinkId, setSharedLinkId] = useState<string | null>(analysisId || null);
   const [sharedLink, setSharedLink] = useState<string | null>(analysisId ? window.location.href : null);
-  const [loadedResults, setLoadedResults] = useState<AnalysisResultsToSave | null>(null); // Use imported type
+  const [loadedResults, setLoadedResults] = useState<AnalysisResultsToSaveExtended | null>(null); // Use extended type with extras
   const [isLoadingShared, setIsLoadingShared] = useState(!!analysisId);
   const [errorLoadingShared, setErrorLoadingShared] = useState<string | null>(null);
 
@@ -107,6 +113,9 @@ const ResultsPage = () => {
   const analysisResults: FullAnalysisResults | AnalysisResultsToSave | null = analysisId ? loadedResults : contextAnalysisResults;
   const isLoading = analysisId ? isLoadingShared : contextIsLoading;
   const error = analysisId ? errorLoadingShared : contextError;
+
+  // Premium status: local ou carregado
+  const isPremiumShared = analysisId ? loadedResults?.isPremiumAnalysis ?? false : isPremium;
   // Note: parsedMessages are NOT available for shared links for privacy
 
   const [calculatedDates, setCalculatedDates] = useState<{ activeDays: number; timeSpan: string }>({ activeDays: 0, timeSpan: 'Período Indefinido' });
@@ -121,8 +130,9 @@ const ResultsPage = () => {
       getAnalysisFunction({ analysisId })
         .then((result) => {
           const data = result.data as { success: boolean; results?: AnalysisResultsToSave; message?: string };
+          console.log("Dados recebidos do banco (getAnalysisFunction):", data);
           if (data.success && data.results) {
-            setLoadedResults(data.results);
+            setLoadedResults(data.results as AnalysisResultsToSaveExtended);
             setSharedLinkId(analysisId);
             setSharedLink(window.location.href);
             toast.success("Análise compartilhada carregada!");
@@ -149,45 +159,76 @@ const ResultsPage = () => {
     }
   }, [analysisId, navigate]);
 
+  const { generatedSign: calculatedSign, generatedSignoDescription, generatedFunFacts } = useMemo(() => {
+    if (analysisResults && isFullAnalysisResults(analysisResults)) {
+        return generateHeuristics(analysisResults);
+    }
+    return {
+        generatedSign: "Explorador do ZapVerso ✨",
+        generatedSignoDescription: null,
+        generatedFunFacts: []
+    };
+  }, [analysisResults]);
 
-  // Effect to calculate dates (runs only when not loading shared data)
+  // Se estiver carregando uma análise compartilhada, priorizar os dados carregados
+  const signDescriptionToShow = analysisId && loadedResults?.generatedSignoDescription
+    ? loadedResults.generatedSignoDescription
+    : generatedSignoDescription;
+
+  const funFactsToShow = analysisId && loadedResults?.generatedFunFacts
+    ? loadedResults.generatedFunFacts
+    : generatedFunFacts;
+
+
+  // Effect para calcular datas, usando timestamps carregados OU mensagens locais
   useEffect(() => {
-    if (!analysisId && contextParsedMessages && contextParsedMessages.length > 0) {
+    let firstDate: Date | null = null;
+    let lastDate: Date | null = null;
+
+    if (analysisId && loadedResults?.firstMessageTimestamp && loadedResults?.lastMessageTimestamp) {
+      try {
+        firstDate = new Date(loadedResults.firstMessageTimestamp as string);
+        lastDate = new Date(loadedResults.lastMessageTimestamp as string);
+      } catch (e) {
+        console.error("Erro ao converter timestamps salvos:", e);
+      }
+    } else if (!analysisId && contextParsedMessages && contextParsedMessages.length > 0) {
       const validTimestamps = contextParsedMessages
         .map(msg => msg.timestamp)
-        .filter((ts): ts is Date => ts !== null)
+        .filter((ts): ts is Date => ts instanceof Date && !isNaN(ts.getTime()))
         .sort((a, b) => a.getTime() - b.getTime());
 
       if (validTimestamps.length > 0) {
-        const firstDate = validTimestamps[0];
-        const lastDate = validTimestamps[validTimestamps.length - 1];
-        const diffTime = Math.abs(lastDate.getTime() - firstDate.getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        const activeDays = diffDays + 1;
-        const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: '2-digit', day: '2-digit' };
-        const timeSpan = `${firstDate.toLocaleDateString('pt-BR', options)} - ${lastDate.toLocaleDateString('pt-BR', options)}`;
-        setCalculatedDates({ activeDays, timeSpan });
-      } else {
-         setCalculatedDates({ activeDays: 0, timeSpan: 'Datas inválidas' });
+        firstDate = validTimestamps[0];
+        lastDate = validTimestamps[validTimestamps.length - 1];
       }
-    } else if (!analysisId) {
-       setCalculatedDates({ activeDays: 0, timeSpan: 'Nenhuma mensagem válida' });
     }
 
-    // Handle navigation/errors based on the correct loading/error state
+    if (firstDate && lastDate && !isNaN(firstDate.getTime()) && !isNaN(lastDate.getTime())) {
+      const diffTime = Math.abs(lastDate.getTime() - firstDate.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      const activeDays = diffDays + 1;
+      const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: '2-digit', day: '2-digit' };
+      const timeSpan = `${firstDate.toLocaleDateString('pt-BR', options)} - ${lastDate.toLocaleDateString('pt-BR', options)}`;
+      setCalculatedDates({ activeDays, timeSpan });
+    } else {
+      setCalculatedDates({ activeDays: 0, timeSpan: 'Período Indefinido' });
+    }
+
+    // Handle navegação e erros
     if (!isLoading && !analysisResults && !error && !analysisId) {
       toast.error("Nenhum resultado de análise encontrado.");
       navigate('/instructions');
     }
     if (error && !analysisId) {
-       toast.error(`Erro ao carregar resultados: ${error}`);
+      toast.error(`Erro ao carregar resultados: ${error}`);
     }
 
     const hour = new Date().getHours();
     if (hour >= 5 && hour < 12) setTimeOfDay('Bom dia');
     else if (hour >= 12 && hour < 18) setTimeOfDay('Boa tarde');
     else setTimeOfDay('Boa noite');
-  }, [analysisId, contextParsedMessages, isLoading, error, navigate, analysisResults]);
+  }, [analysisId, loadedResults, contextParsedMessages, isLoading, error, navigate, analysisResults]);
 
   // Gera um ID local único para análises locais sem ID
   useEffect(() => {
@@ -275,19 +316,7 @@ const ResultsPage = () => {
 
       return { generatedSign: sign, generatedSignoDescription: signoDescription, generatedFunFacts: funFacts.slice(0, 3) };
   };
-
-  const { generatedSign: calculatedSign, generatedSignoDescription, generatedFunFacts } = useMemo(() => {
-    // Only generate heuristics if we have the full analysis results from context
-    if (analysisResults && isFullAnalysisResults(analysisResults)) {
-        return generateHeuristics(analysisResults);
-    }
-    // If loading shared results or full results are unavailable, return defaults
-    return {
-        generatedSign: "Explorador do ZapVerso ✨", // Default sign
-        generatedSignoDescription: null, // Description not available for shared
-        generatedFunFacts: [] // Fun facts not available for shared
-    };
-  }, [analysisResults]);
+// Removed duplicate useMemo and variable declarations below
 
   // Update context only if we calculated the sign from context data
   useEffect(() => {
@@ -382,122 +411,135 @@ const ResultsPage = () => {
   const handleSubscribe = () => { toast.success('Obrigado por se interessar! Em um app real, isto processaria sua assinatura.'); setTimeout(() => setShowPremium(false), 1500); };
 
   const handleSenderClick = (sender: string) => {
-    if (!analysisId) {
-      setFocusedSender(sender);
-      toast.info(`Analisando ${sender}...`);
-    }
+    setFocusedSender(sender);
+    toast.info(`Analisando ${sender}...`);
   };
 
   // --- Function to Save Analysis and Generate Link ---
   const handleSaveAndShare = async () => {
-    // Use context results for saving, ensure they exist
-    if (!contextAnalysisResults) { // Removed check for contextGeneratedSign as it's not saved
-       toast.error("A análise original não está disponível para salvar.");
-       return;
+    console.log("Análise local (contextAnalysisResults):", contextAnalysisResults);
+    console.log("Mensagens locais (contextParsedMessages):", contextParsedMessages);
+    if (!contextAnalysisResults) {
+      toast.error("A análise original não está disponível para salvar.");
+      return;
     }
     if (sharedLinkId) {
-       toast.info("O link já foi gerado para esta análise.");
-       return;
+      toast.info("O link já foi gerado para esta análise.");
+      return;
     }
 
     setIsSaving(true);
     toast.info("Salvando análise e gerando link...");
 
-    // Prepare data payload - select ONLY non-sensitive fields from context results
-    // Ensure the fields match the EXPANDED AnalysisResultsToSave interface
-    const dataToSave: Omit<AnalysisResultsToSave, 'createdAt'> = {
-        // Existing fields
-        totalMessages: contextAnalysisResults.totalMessages,
-        messagesPerSender: contextAnalysisResults.messagesPerSender,
-        emojiCounts: contextAnalysisResults.emojiCounts,
-        mostFrequentEmoji: contextAnalysisResults.mostFrequentEmoji,
-        mostFrequentKeywordCategory: contextAnalysisResults.mostFrequentKeywordCategory, // Added this field
-        keywordCounts: { // Ensure all relevant categories are included if more exist
-            laughter: contextAnalysisResults.keywordCounts['laughter'] ?? 0,
-            questions: contextAnalysisResults.keywordCounts['questions'] ?? 0,
-            positive: contextAnalysisResults.keywordCounts['positive'] ?? 0,
-            negative: contextAnalysisResults.keywordCounts['negative'] ?? 0,
-        },
-        averageMessageLength: contextAnalysisResults.averageMessageLength,
-        favoriteWord: contextAnalysisResults.favoriteWord,
-        punctuationEmphasisCount: contextAnalysisResults.punctuationEmphasisCount,
-        capsWordCount: contextAnalysisResults.capsWordCount,
-        topExpressions: contextAnalysisResults.topExpressions,
-        passiveAggressivePercentage: contextAnalysisResults.passiveAggressivePercentage,
-        flirtationPercentage: contextAnalysisResults.flirtationPercentage,
-        aiPrediction: aiPrediction, // Assuming these come from context or state
-        aiPoem: aiPoem, // Assuming these come from context or state
-        aiStyleAnalysis: aiStyleAnalysis, // Assuming these come from context or state
-        generatedSign: calculatedSign, // Use the calculated sign from useMemo
-        isPremiumAnalysis: isPremium, // Use actual premium status from context
-        totalRedFlags: contextAnalysisResults.totalRedFlags,
-        totalGreenFlags: contextAnalysisResults.totalGreenFlags,
-        aiFlagPersonalityAnalysis: aiFlagPersonalityAnalysis, // Get from context state directly
+    // Extrair datas do contexto
+    let firstDate: Date | null = null;
+    let lastDate: Date | null = null;
+    if (contextParsedMessages && contextParsedMessages.length > 0) {
+      const validTimestamps = contextParsedMessages
+        .map(msg => msg.timestamp)
+        .filter((ts): ts is Date => ts instanceof Date && !isNaN(ts.getTime()))
+        .sort((a, b) => a.getTime() - b.getTime());
+      if (validTimestamps.length > 0) {
+        firstDate = validTimestamps[0];
+        lastDate = validTimestamps[validTimestamps.length - 1];
+      }
+    }
 
-        // Newly added fields for the perfect mirror
-        peakHours: contextAnalysisResults.peakHours, // Assuming this exists on FullAnalysisResults
-        mostActiveHour: contextAnalysisResults.mostActiveHour, // Assuming this exists on FullAnalysisResults
-        totalMessageLength: contextAnalysisResults.totalMessageLength, // Assuming this exists on FullAnalysisResults
-        wordCounts: contextAnalysisResults.wordCounts, // Assuming this exists on FullAnalysisResults
-        expressionCounts: contextAnalysisResults.expressionCounts, // Assuming this exists on FullAnalysisResults
-        averageResponseTimesMinutes: contextAnalysisResults.averageResponseTimesMinutes, // Assuming this exists on FullAnalysisResults
-        messagesPerDayOfWeek: contextAnalysisResults.messagesPerDayOfWeek, // Assuming this exists on FullAnalysisResults
-        messagesPerDate: contextAnalysisResults.messagesPerDate, // Assuming this exists on FullAnalysisResults
+    const dataToSave: Omit<AnalysisResultsToSaveExtended, 'createdAt'> = {
+      totalMessages: contextAnalysisResults.totalMessages,
+      messagesPerSender: contextAnalysisResults.messagesPerSender,
+      emojiCounts: contextAnalysisResults.emojiCounts,
+      mostFrequentEmoji: contextAnalysisResults.mostFrequentEmoji,
+      mostFrequentKeywordCategory: contextAnalysisResults.mostFrequentKeywordCategory,
+      keywordCounts: {
+        laughter: contextAnalysisResults.keywordCounts['laughter'] ?? 0,
+        questions: contextAnalysisResults.keywordCounts['questions'] ?? 0,
+        positive: contextAnalysisResults.keywordCounts['positive'] ?? 0,
+        negative: contextAnalysisResults.keywordCounts['negative'] ?? 0,
+      },
+      averageMessageLength: contextAnalysisResults.averageMessageLength,
+      favoriteWord: contextAnalysisResults.favoriteWord,
+      punctuationEmphasisCount: contextAnalysisResults.punctuationEmphasisCount,
+      capsWordCount: contextAnalysisResults.capsWordCount,
+      topExpressions: contextAnalysisResults.topExpressions,
+      passiveAggressivePercentage: contextAnalysisResults.passiveAggressivePercentage,
+      flirtationPercentage: contextAnalysisResults.flirtationPercentage,
+      aiPrediction: aiPrediction,
+      aiPoem: aiPoem,
+      aiStyleAnalysis: aiStyleAnalysis,
+      generatedSign: calculatedSign,
+      isPremiumAnalysis: isPremium,
+      totalRedFlags: contextAnalysisResults.totalRedFlags,
+      totalGreenFlags: contextAnalysisResults.totalGreenFlags,
+      aiFlagPersonalityAnalysis: aiFlagPersonalityAnalysis,
 
-        // Ensure statsPerSender includes ALL fields from the expanded interface with correct keywordCounts structure
-        statsPerSender: Object.entries(contextAnalysisResults.statsPerSender).reduce((acc, [sender, stats]) => {
-            // Explicitly map fields to match AnalysisResultsToSave['statsPerSender'][string]
-            const senderData: AnalysisResultsToSave['statsPerSender'][string] = {
-                messageCount: stats.messageCount,
-                totalLength: stats.totalLength,
-                averageLength: stats.averageLength,
-                emojiCounts: stats.emojiCounts,
-                keywordCounts: { // Explicitly map required keyword counts
-                    laughter: stats.keywordCounts['laughter'] ?? 0,
-                    questions: stats.keywordCounts['questions'] ?? 0,
-                    positive: stats.keywordCounts['positive'] ?? 0,
-                    negative: stats.keywordCounts['negative'] ?? 0,
-                    // Add other categories here if needed, matching the backend interface
-                },
-                punctuationEmphasisCount: stats.punctuationEmphasisCount,
-                capsWordCount: stats.capsWordCount,
-                totalResponseTimeMs: stats.totalResponseTimeMs,
-                responseCount: stats.responseCount,
-                averageResponseTimeMinutes: stats.averageResponseTimeMinutes,
-                passiveAggressiveCount: stats.passiveAggressiveCount,
-                flirtationCount: stats.flirtationCount,
-                passiveAggressivePercentage: stats.passiveAggressivePercentage,
-                flirtationPercentage: stats.flirtationPercentage,
-                redFlagCount: stats.redFlagCount,
-                greenFlagCount: stats.greenFlagCount,
-                redFlagKeywords: stats.redFlagKeywords,
-                greenFlagKeywords: stats.greenFlagKeywords,
-            };
-            acc[sender] = senderData;
-            return acc;
-        }, {} as AnalysisResultsToSave['statsPerSender']),
+      peakHours: contextAnalysisResults.peakHours,
+      mostActiveHour: contextAnalysisResults.mostActiveHour,
+      totalMessageLength: contextAnalysisResults.totalMessageLength,
+      wordCounts: contextAnalysisResults.wordCounts,
+      expressionCounts: contextAnalysisResults.expressionCounts,
+      averageResponseTimesMinutes: contextAnalysisResults.averageResponseTimesMinutes,
+      messagesPerDayOfWeek: contextAnalysisResults.messagesPerDayOfWeek,
+      messagesPerDate: contextAnalysisResults.messagesPerDate,
+
+      // timestamps como ISO strings
+      firstMessageTimestamp: firstDate ? firstDate.toISOString() : null,
+      lastMessageTimestamp: lastDate ? lastDate.toISOString() : null,
+
+      // CAMPOS ADICIONAIS para espelhar tudo na tela compartilhada
+      generatedSignoDescription: generatedSignoDescription ?? null,
+      generatedFunFacts: generatedFunFacts ?? [],
+
+      statsPerSender: Object.entries(contextAnalysisResults.statsPerSender).reduce((acc, [sender, stats]) => {
+        const senderData: AnalysisResultsToSave['statsPerSender'][string] = {
+          messageCount: stats.messageCount,
+          totalLength: stats.totalLength,
+          averageLength: stats.averageLength,
+          emojiCounts: stats.emojiCounts,
+          keywordCounts: {
+            laughter: stats.keywordCounts['laughter'] ?? 0,
+            questions: stats.keywordCounts['questions'] ?? 0,
+            positive: stats.keywordCounts['positive'] ?? 0,
+            negative: stats.keywordCounts['negative'] ?? 0,
+          },
+          punctuationEmphasisCount: stats.punctuationEmphasisCount,
+          capsWordCount: stats.capsWordCount,
+          totalResponseTimeMs: stats.totalResponseTimeMs,
+          responseCount: stats.responseCount,
+          averageResponseTimeMinutes: stats.averageResponseTimeMinutes,
+          passiveAggressiveCount: stats.passiveAggressiveCount,
+          flirtationCount: stats.flirtationCount,
+          passiveAggressivePercentage: stats.passiveAggressivePercentage,
+          flirtationPercentage: stats.flirtationPercentage,
+          redFlagCount: stats.redFlagCount,
+          greenFlagCount: stats.greenFlagCount,
+          redFlagKeywords: stats.redFlagKeywords,
+          greenFlagKeywords: stats.greenFlagKeywords,
+        };
+        acc[sender] = senderData;
+        return acc;
+      }, {} as AnalysisResultsToSave['statsPerSender']),
     };
 
-    // Optional: Add validation here to ensure all required fields are present in dataToSave, especially the newly added ones
-    // e.g., if (!dataToSave.peakHours) { console.warn("Missing peakHours in dataToSave"); /* handle potentially */ }
+    console.log("Payload que será enviado para o banco (dataToSave):", dataToSave);
 
     try {
-        const result = await saveAnalysisFunction(dataToSave);
-        const saveData = result.data as { success: boolean; analysisId?: string; message?: string };
+      const result = await saveAnalysisFunction(dataToSave);
+      const saveData = result.data as { success: boolean; analysisId?: string; message?: string };
 
-        if (saveData.success && saveData.analysisId) {
-            const newId = saveData.analysisId;
-            setSharedLinkId(newId);
-            const newUrl = `${window.location.origin}/results/${newId}`;
-            setSharedLink(newUrl);
-            navigate(`/results/${newId}`, { replace: true });
-            toast.success("Análise salva! Link de compartilhamento gerado.");
-        } else {
-            throw new Error(saveData.message || "Falha ao salvar análise.");
-        }
+      if (saveData.success && saveData.analysisId) {
+        const newId = saveData.analysisId;
+        setSharedLinkId(newId);
+        const newUrl = `${window.location.origin}/results/${newId}`;
+        setSharedLink(newUrl);
+        navigate(`/results/${newId}`, { replace: true });
+        toast.success("Análise salva! Link de compartilhamento gerado.");
+      } else {
+        throw new Error(saveData.message || "Falha ao salvar análise.");
+      }
     } catch (error: any) {
-        console.error("Erro ao salvar análise:", error);
-        toast.error(`Falha ao salvar: ${error.message || 'Erro desconhecido.'}`);
+      console.error("Erro ao salvar análise:", error);
+      toast.error(`Falha ao salvar: ${error.message || 'Erro desconhecido.'}`);
         setSharedLinkId(null);
         setSharedLink(null);
     } finally {
@@ -598,7 +640,7 @@ const ResultsPage = () => {
              <h2 className="text-lg font-medium opacity-80">{timeOfDay}, Astroanalista!</h2>
              <h1 className="text-3xl font-bold">{analysisId ? "Análise Compartilhada" : mockResults.title}</h1>
           </div>
-          {!analysisId && (
+          {(
              <Badge variant="outline" className="bg-white/20">
                <Calendar className="h-3.5 w-3.5 mr-1" />
                <span className="text-xs">{activeDays} dia{activeDays !== 1 ? 's' : ''}</span>
@@ -610,7 +652,7 @@ const ResultsPage = () => {
         <div className="bg-white/10 rounded-xl p-3 mb-6 flex justify-between items-center">
           <div>
              <h3 className="font-medium">{analysisId ? "Resultado Salvo" : genericChatName}</h3>
-             {!analysisId && <p className="text-xs opacity-70">{timeSpan}</p>}
+             <p className="text-xs opacity-70">{timeSpan}</p>
           </div>
           <div className="text-right">
              <p className="font-bold">{analysisResults.totalMessages ?? 'N/A'}</p>
@@ -623,8 +665,8 @@ const ResultsPage = () => {
           <div className="text-center">
             <FloatingEmoji emoji="✨" size="md" />
             <h2 className="text-2xl font-bold my-2">{displaySign || "Signo Indefinido"}</h2>
-            {/* Show description only if available and not shared */}
-            {!analysisId && generatedSignoDescription && <p className="text-sm opacity-90 px-4">{generatedSignoDescription}</p>}
+            {/* Show description if available */}
+            {signDescriptionToShow && <p className="text-sm opacity-90 px-4">{signDescriptionToShow}</p>}
             <FloatingEmoji emoji="✨" size="md" />
           </div>
         </motion.div>
@@ -633,15 +675,15 @@ const ResultsPage = () => {
         <motion.div variants={cardVariants}>
           <ResultCard title="Participantes" variant="primary">
             <div className="space-y-4">
-              {!analysisId && <p className="text-sm opacity-80 mb-2">Clique em um participante para ver detalhes:</p>}
+              <p className="text-sm opacity-80 mb-2">Clique em um participante para ver detalhes:</p>
             <div className="flex flex-wrap gap-2 justify-center">
               {analysisResults.messagesPerSender && Object.entries(analysisResults.messagesPerSender)
                 .sort(([, countA], [, countB]) => (countB ?? 0) - (countA ?? 0))
                 .map(([sender, count]) => (
                   <div
                     key={sender}
-                    className={`transition-transform ${!analysisId ? 'cursor-pointer hover:scale-105' : ''}`}
-                    onClick={() => !analysisId && handleSenderClick(sender)}
+                    className="transition-transform cursor-pointer hover:scale-105"
+                    onClick={() => handleSenderClick(sender)}
                   >
                     <ContactBubble
                       name={sender}
@@ -655,7 +697,7 @@ const ResultsPage = () => {
         </motion.div>
 
         {/* --- User Selector (Not a card, keep outside stagger or wrap separately if needed) --- */}
-        {!analysisId && analysisResults?.messagesPerSender && Object.keys(analysisResults.messagesPerSender).length > 0 && (
+        {analysisResults?.messagesPerSender && Object.keys(analysisResults.messagesPerSender).length > 0 && (
           <div className="mb-6 px-4 py-3 bg-black/10 rounded-lg">
             <Label htmlFor="user-selector" className="text-sm font-medium mb-2 block opacity-80">Quem é você na conversa?</Label>
             {/* Use "__none__" for placeholder value and adjust onValueChange */}
@@ -762,8 +804,8 @@ const ResultsPage = () => {
                   return (
                     <div
                       key={sender}
-                      className={`border-b border-gray-300/30 pb-3 last:border-b-0 rounded-md p-2 transition-colors ${!analysisId ? 'hover:bg-white/5 cursor-pointer' : ''} ${sender === focusedSender ? 'bg-white/10' : ''}`}
-                      onClick={() => !analysisId && handleSenderClick(sender)}
+                      className={`border-b border-gray-300/30 pb-3 last:border-b-0 rounded-md p-2 transition-colors hover:bg-white/5 cursor-pointer ${sender === focusedSender ? 'bg-white/10' : ''}`}
+                      onClick={() => handleSenderClick(sender)}
                     >
                       <h4 className="font-semibold mb-1 flex items-center"><UserCircle className="w-4 h-4 mr-2 opacity-70"/>{sender}</h4>
                       {/* Use optional chaining ?. for all accesses to stats properties */}
@@ -775,9 +817,9 @@ const ResultsPage = () => {
                         {/* Check for averageResponseTimeMinutes specifically */}
                         {stats?.averageResponseTimeMinutes !== undefined && stats?.averageResponseTimeMinutes !== null ? (
                           <span className="truncate flex items-center"><Clock1 className="w-3.5 h-3.5 mr-1"/> Resposta: {stats.averageResponseTimeMinutes} min</span>
-                        ) : !analysisId ? ( // Only show "Sem respostas" if it's the local view
+                        ) : (
                           <span className="truncate flex items-center text-gray-400"><Clock1 className="w-3.5 h-3.5 mr-1"/> Sem respostas</span>
-                        ) : null}
+                        )}
                         <span className="col-span-2 sm:col-span-1">
                           Vibe: {senderSentimentRatio > 1.5 ? <TrendingUp className="w-4 h-4 inline text-green-400" /> : senderSentimentRatio < 0.7 ? <TrendingDown className="w-4 h-4 inline text-red-400" /> : <span className="text-gray-400">~</span>}
                         </span>
@@ -856,11 +898,11 @@ const ResultsPage = () => {
 
         {/* --- Red/Green Flags Card --- */}
         {/* Show this card only if there are flags OR if it's a shared link (where flags might exist but aren't calculated client-side) */}
-        {/* Show this card only if there are flags OR if it's a shared link (where flags might exist but aren't calculated client-side) */}
         {/* Safely access flag counts */}
+        {/* Using ternary operator for safer conditional rendering */}
         {( (analysisResults && 'totalRedFlags' in analysisResults && analysisResults.totalRedFlags > 0) ||
            (analysisResults && 'totalGreenFlags' in analysisResults && analysisResults.totalGreenFlags > 0) ||
-           analysisId ) && (
+           analysisId ) ? (
           <motion.div variants={cardVariants}>
             <ResultCard title="🚩 Balanço de Sinais 💚" variant="secondary">
               <div className="space-y-4">
@@ -912,7 +954,7 @@ const ResultsPage = () => {
               </div>
             </ResultCard>
           </motion.div>
-        )}
+        ) : null}
 
 
         {/* Expressions Card */}
@@ -983,14 +1025,14 @@ const ResultsPage = () => {
           </ResultCard>
         </motion.div>
 
-        {/* Fun Facts Card - Hide if shared link as they are generated dynamically */}
-        {!analysisId && (
+        {/* Fun Facts Card - Render only if not a shared link, using ternary */}
+        {!analysisId ? (
           <motion.div variants={cardVariants}>
             <ResultCard title="Pequenas Verdades Cósmicas" variant="accent">
-               {generatedFunFacts.length > 0 ? (<ul className="space-y-3">{generatedFunFacts.map((fact, index) => (<li key={index} className="flex items-start"><span className="mr-2 text-lg">•</span><span>{fact}</span></li>))}</ul>) : (<p className="text-sm opacity-70 text-center py-4">Nenhuma verdade cósmica encontrada por enquanto.</p>)}
+               {funFactsToShow.length > 0 ? (<ul className="space-y-3">{funFactsToShow.map((fact, index) => (<li key={index} className="flex items-start"><span className="mr-2 text-lg">•</span><span>{fact}</span></li>))}</ul>) : (<p className="text-sm opacity-70 text-center py-4">Nenhuma verdade cósmica encontrada por enquanto.</p>)}
             </ResultCard>
           </motion.div>
-        )}
+        ) : null}
 
         {/* --- Premium Section --- */}
         {/* Show premium stats if viewing a saved analysis that was premium OR has AI results, OR if premium mock is active (and not viewing shared) */}
@@ -1043,8 +1085,7 @@ const ResultsPage = () => {
               </div>
             )}
           </>
-        ) : ( // Show upsell only if not viewing shared link AND not premium mock
-           !analysisId && !isPremiumMock && (
+        ) : !isPremiumShared ? ( // Show upsell only if not viewing shared link AND not already premium
              <motion.div variants={cardVariants}>
                <ResultCard title="Desbloqueie Análises Premium ✨" variant="accent">
                  <div className="text-center py-4">
@@ -1066,8 +1107,7 @@ const ResultsPage = () => {
                  </div>
                </ResultCard>
              </motion.div>
-           )
-        )}
+        ) : null } {/* Return null if not showing premium content and already premium shared */}
 
         {/* --- Action Buttons --- */}
 
@@ -1115,7 +1155,7 @@ const ResultsPage = () => {
         {/* Bottom Buttons */}
          <div className="mt-8 mb-4">
             {/* Premium Upsell Button (Hide if shared link or already premium) */}
-            {!analysisId && !isPremiumMock && (
+            {!isPremiumShared && (
               <Button onClick={handlePremiumClick} className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-white font-semibold py-4 rounded-xl shadow-lg">Desbloqueie Análises Premium ✨</Button>
             )}
          </div>
@@ -1139,7 +1179,7 @@ const ResultsPage = () => {
       </motion.div> {/* End of container motion.div */}
 
       {/* Sender Focus Modal (Hide if shared link) - Keep outside main animation flow */}
-      {!analysisId && focusedSender && analysisResults?.statsPerSender?.[focusedSender] && (
+      {focusedSender && analysisResults?.statsPerSender?.[focusedSender] && (
         <SenderFocus
           sender={focusedSender}
           // Cast needed here, ensure the data passed is compatible with SenderStats expected by SenderFocus

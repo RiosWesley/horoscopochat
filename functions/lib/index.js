@@ -295,6 +295,13 @@ exports.saveAnalysisResults = functions.https.onCall(async (data, context) => {
         dataToSave.aiStyleAnalysis = receivedData.aiStyleAnalysis;
     if (typeof receivedData.generatedSign === 'string' || receivedData.generatedSign === null)
         dataToSave.generatedSign = receivedData.generatedSign;
+    // Mapear descrição do signo e fun facts
+    if (typeof receivedData.generatedSignoDescription === 'string' || receivedData.generatedSignoDescription === null) {
+        dataToSave.generatedSignoDescription = receivedData.generatedSignoDescription;
+    }
+    if (Array.isArray(receivedData.generatedFunFacts)) {
+        dataToSave.generatedFunFacts = receivedData.generatedFunFacts;
+    }
     if (typeof receivedData.isPremiumAnalysis === 'boolean')
         dataToSave.isPremiumAnalysis = receivedData.isPremiumAnalysis;
     if (typeof receivedData.totalRedFlags === 'number')
@@ -305,7 +312,30 @@ exports.saveAnalysisResults = functions.https.onCall(async (data, context) => {
     if (typeof receivedData.aiFlagPersonalityAnalysis === 'object' || receivedData.aiFlagPersonalityAnalysis === null) {
         dataToSave.aiFlagPersonalityAnalysis = receivedData.aiFlagPersonalityAnalysis;
     }
-    // --- End mapping ---
+    // --- Map dos novos campos de timestamp ---
+    if (typeof receivedData.firstMessageTimestamp === 'string') {
+        try {
+            dataToSave.firstMessageTimestamp = admin.firestore.Timestamp.fromDate(new Date(receivedData.firstMessageTimestamp));
+        }
+        catch (e) {
+            functions.logger.warn("Invalid firstMessageTimestamp received:", receivedData.firstMessageTimestamp);
+        }
+    }
+    else if (receivedData.firstMessageTimestamp === null) {
+        dataToSave.firstMessageTimestamp = null;
+    }
+    if (typeof receivedData.lastMessageTimestamp === 'string') {
+        try {
+            dataToSave.lastMessageTimestamp = admin.firestore.Timestamp.fromDate(new Date(receivedData.lastMessageTimestamp));
+        }
+        catch (e) {
+            functions.logger.warn("Invalid lastMessageTimestamp received:", receivedData.lastMessageTimestamp);
+        }
+    }
+    else if (receivedData.lastMessageTimestamp === null) {
+        dataToSave.lastMessageTimestamp = null;
+    }
+    // --- Fim do mapeamento timestamps ---
     dataToSave.createdAt = admin.firestore.FieldValue.serverTimestamp();
     // Check if we actually mapped any valid fields besides createdAt
     if (Object.keys(dataToSave).length <= 1) {
@@ -350,20 +380,22 @@ exports.getAnalysisResults = functions.https.onCall(async (data, context) => {
         else {
             const savedData = docSnap.data(); // Cast to your interface for better type safety
             if (savedData?.createdAt && typeof savedData.createdAt?.toDate === 'function') {
-                // Convert Firestore Timestamp to ISO string for JSON serialization
                 savedData.createdAt = savedData.createdAt.toDate().toISOString();
             }
-            // Ensure other potential Timestamp fields are also converted if they exist
+            if (savedData?.firstMessageTimestamp && typeof savedData.firstMessageTimestamp?.toDate === 'function') {
+                savedData.firstMessageTimestamp = savedData.firstMessageTimestamp.toDate().toISOString();
+            }
+            if (savedData?.lastMessageTimestamp && typeof savedData.lastMessageTimestamp?.toDate === 'function') {
+                savedData.lastMessageTimestamp = savedData.lastMessageTimestamp.toDate().toISOString();
+            }
             functions.logger.info(`Successfully fetched analysis ${analysisId}`);
             return { success: true, results: savedData };
         }
     }
     catch (error) {
-        // Re-throw specific known errors
         if (error instanceof functions.https.HttpsError) {
             throw error;
         }
-        // Log unknown errors and throw a generic internal error
         functions.logger.error(`Error fetching analysis ${analysisId} from Firestore:`, error);
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
         throw new functions.https.HttpsError("internal", `Failed to retrieve analysis results: ${errorMessage}`);
