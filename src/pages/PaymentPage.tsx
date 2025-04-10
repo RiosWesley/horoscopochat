@@ -54,7 +54,7 @@ const PaymentPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [mpInstance, setMpInstance] = useState<any>(null);
 
-  const premiumPrice = 14.90;
+  const premiumPrice = 1.99;
 
 const [identificationType, setIdentificationType] = useState<"CPF" | "CNPJ">("CPF");
 const [identificationNumber, setIdentificationNumber] = useState<string>("");

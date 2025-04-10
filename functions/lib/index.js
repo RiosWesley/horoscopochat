@@ -312,6 +312,18 @@ exports.saveAnalysisResults = functions.https.onCall(async (data, context) => {
     if (typeof receivedData.aiFlagPersonalityAnalysis === 'object' || receivedData.aiFlagPersonalityAnalysis === null) {
         dataToSave.aiFlagPersonalityAnalysis = receivedData.aiFlagPersonalityAnalysis;
     }
+    if (Array.isArray(receivedData.parsedMessages))
+        dataToSave.parsedMessages = receivedData.parsedMessages;
+    if (typeof receivedData.messagesPerDate === 'object' && receivedData.messagesPerDate !== null)
+        dataToSave.messagesPerDate = receivedData.messagesPerDate;
+    if (typeof receivedData.messagesPerDayOfWeek === 'object' && receivedData.messagesPerDayOfWeek !== null)
+        dataToSave.messagesPerDayOfWeek = receivedData.messagesPerDayOfWeek;
+    if (typeof receivedData.peakHours === 'object' && receivedData.peakHours !== null)
+        dataToSave.peakHours = receivedData.peakHours;
+    if (typeof receivedData.messagesPerSender === 'object' && receivedData.messagesPerSender !== null)
+        dataToSave.messagesPerSender = receivedData.messagesPerSender;
+    if (typeof receivedData.averageResponseTimesMinutes === 'object' && receivedData.averageResponseTimesMinutes !== null)
+        dataToSave.averageResponseTimesMinutes = receivedData.averageResponseTimesMinutes;
     // --- Map dos novos campos de timestamp ---
     if (typeof receivedData.firstMessageTimestamp === 'string') {
         try {

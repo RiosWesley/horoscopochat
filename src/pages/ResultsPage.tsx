@@ -535,6 +535,13 @@ const ResultsPage = () => {
       }));
       (dataToSave as any).parsedMessages = anonymizedMessages;
 
+      // Incluir dados detalhados para gráficos e horários
+      (dataToSave as any).messagesPerDate = contextAnalysisResults?.messagesPerDate;
+      (dataToSave as any).messagesPerDayOfWeek = contextAnalysisResults?.messagesPerDayOfWeek;
+      (dataToSave as any).peakHours = contextAnalysisResults?.peakHours;
+      (dataToSave as any).messagesPerSender = contextAnalysisResults?.messagesPerSender;
+      (dataToSave as any).averageResponseTimesMinutes = contextAnalysisResults?.averageResponseTimesMinutes;
+
       const result = await saveAnalysisFunction(dataToSave);
       const saveData = result.data as { success: boolean; analysisId?: string; message?: string };
 
