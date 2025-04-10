@@ -340,7 +340,7 @@ const PremiumPage: React.FC = () => {
   return (
     <div className="container mx-auto p-4 md:p-8 min-h-screen flex flex-col">
       <header className="mb-8 flex items-center justify-between">
-        <Link to="/results" className="flex items-center text-blue-600 hover:underline">
+        <Link to={`/results/${analysisId}`} className="flex items-center text-blue-600 hover:underline">
           <ArrowLeft className="mr-2 h-5 w-5" />
           Voltar aos Resultados
         </Link>
@@ -359,16 +359,10 @@ const PremiumPage: React.FC = () => {
             </p>
 
             {/* AI Consent Checkbox */}
-            <div className="flex items-center space-x-2 bg-yellow-100 border border-yellow-300 text-yellow-800 p-3 rounded-md mb-6 text-sm">
-              <Checkbox
-                id="ai-consent"
-                checked={aiConsentGiven}
-                onCheckedChange={(checked) => setAiConsentGiven(checked as boolean)}
-                aria-label="Consentimento para uso de IA"
-              />
-              <Label htmlFor="ai-consent" className="leading-snug cursor-pointer">
-                Concordo em enviar dados anonimizados do chat (nomes substituídos por "Pessoa 1", "Pessoa 2", etc.) para a API da Google (Gemini) para gerar as análises de IA abaixo. Nenhum dado pessoal identificável é enviado.
-              </Label>
+            <div className="bg-yellow-100 border border-yellow-300 text-yellow-800 p-3 rounded-md mb-6 text-sm">
+              <p>
+                Ao usar as funções de IA abaixo, você concorda que os dados anonimizados do chat (nomes substituídos por "Pessoa 1", "Pessoa 2", etc.) serão enviados para a API da Google (Gemini) para gerar as análises. Nenhum dado pessoal identificável é enviado.
+              </p>
             </div>
 
             {/* AI Premium Content */}
@@ -476,22 +470,22 @@ const PremiumPage: React.FC = () => {
                    <CardTitle className="text-lg text-indigo-700 flex items-center"><Smile className="w-5 h-5 mr-2 text-pink-500"/> Análise de Flerte</CardTitle>
                  </CardHeader>
                  <CardContent className="p-0">
-                   {analysisResults ? (
+                   {(analysisResults || loadedAnalysis) ? (
                      <div className="space-y-3">
                        <div className="flex justify-between items-center text-base">
                          <span className="font-medium">Geral (% msgs):</span>
-                         <span className="font-bold text-pink-600">{analysisResults.flirtationPercentage?.toFixed(1) ?? '0.0'}%</span>
+                         <span className="font-bold text-pink-600">
+                           {((analysisResults?.flirtationPercentage ?? loadedAnalysis?.flirtationPercentage) || 0).toFixed(1)}%
+                         </span>
                        </div>
-                       {Object.keys(analysisResults.statsPerSender).length > 1 && (
+                       {Object.keys((analysisResults?.statsPerSender ?? loadedAnalysis?.statsPerSender) || {}).length > 1 && (
                          <div>
                            <h5 className="text-sm font-semibold mt-3 mb-1 text-gray-600">Por Participante:</h5>
                            <ul className="list-disc list-inside text-sm space-y-1">
-                             {Object.entries(analysisResults.statsPerSender)
-                               .sort(([, a], [, b]) => (b.flirtationPercentage ?? 0) - (a.flirtationPercentage ?? 0))
-                               .map(([sender, stats]) => (
-                                 <li key={sender}>
-                                   <span className="font-medium">{sender}:</span> {stats.flirtationPercentage?.toFixed(1) ?? '0.0'}%
-                                 </li>
+                             {Object.entries(analysisResults?.statsPerSender ?? loadedAnalysis?.statsPerSender ?? {}).sort(([, a]: any, [, b]: any) => (b.flirtationPercentage ?? 0) - (a.flirtationPercentage ?? 0)).map(([sender, stats]: any) => (
+                               <li key={sender}>
+                                 <span className="font-medium">{sender}:</span> {(stats.flirtationPercentage ?? 0).toFixed(1)}%
+                               </li>
                              ))}
                            </ul>
                          </div>
@@ -499,7 +493,7 @@ const PremiumPage: React.FC = () => {
                        {/* Compatibility Section */}
                        <div className="pt-3 mt-3 border-t border-gray-200">
                           <h5 className="text-sm font-semibold mb-2 text-gray-600">💘 Compatibilidade Amorosa:</h5>
-                          <RenderCompatibility analysisResults={analysisResults} />
+                          <RenderCompatibility analysisResults={analysisResults ?? loadedAnalysis} />
                        </div>
                      </div>
                    ) : (
