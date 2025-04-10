@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { Link, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from "@/components/ui/badge"; // Import Badge
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +10,7 @@ import { ArrowLeft, BrainCircuit, Feather, Sparkles, Loader2, Users, Smile, Hear
 import { useChatAnalysis } from '@/context/ChatAnalysisContext';
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { firebaseApp } from '@/firebaseConfig';
+import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { toast } from 'sonner'; // Import toast
 import type { ParsedMessage } from '../lib/parseChat'; // Import ParsedMessage type
 
@@ -109,30 +110,56 @@ const PremiumPage: React.FC = () => {
     setAiPoem,
     aiStyleAnalysis,
     setAiStyleAnalysis,
-    // Removed global rate limit state from context
     analysisResults,
     generatedSign,
-    selectedSender, // Get selected sender to highlight
-    aiFlagPersonalityAnalysis, // Get the new AI analysis state
-    setAiFlagPersonalityAnalysis // Get the setter for the new state
+    selectedSender,
+    aiFlagPersonalityAnalysis,
+    setAiFlagPersonalityAnalysis
   } = useChatAnalysis();
+
+  const { analysisId } = useParams();
+
+  const [loadedAnalysis, setLoadedAnalysis] = useState<any | null>(null);
 
   const [isPredictionLoading, setIsPredictionLoading] = useState(false);
   const [isPoemLoading, setIsPoemLoading] = useState(false);
   const [isStyleLoading, setIsStyleLoading] = useState(false);
-  const [isFlagPersonalityLoading, setIsFlagPersonalityLoading] = useState(false); // Add loading state for flag personality
+  const [isFlagPersonalityLoading, setIsFlagPersonalityLoading] = useState(false);
+
   const [aiConsentGiven, setAiConsentGiven] = useState<boolean>(() => {
     const saved = localStorage.getItem('aiConsentGiven');
     return saved === 'true';
   });
 
-  // State to track last call timestamp for each feature
   const [lastCallTimestamps, setLastCallTimestamps] = useState<Record<AiFeatureType, number>>({
     prediction: 0,
     poem: 0,
     style: 0,
     flagPersonality: 0,
   });
+
+  useEffect(() => {
+    const fetchAnalysis = async () => {
+      if (!analysisId) return;
+      if (analysisResults) return; // Se já tem no contexto, não busca
+
+      try {
+        const db = getFirestore(firebaseApp);
+        const docRef = doc(db, 'analyses', analysisId);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          setLoadedAnalysis(docSnap.data());
+        } else {
+          console.error('Análise não encontrada no Firestore');
+        }
+      } catch (error) {
+        console.error('Erro ao buscar análise do Firestore:', error);
+      }
+    };
+
+    fetchAnalysis();
+  }, [analysisId, analysisResults]);
 
   const callAIFeature = useCallback(async (featureType: AiFeatureType) => {
     const now = Date.now();
@@ -390,58 +417,58 @@ const PremiumPage: React.FC = () => {
               <Card className="bg-white p-4">
                  <CardHeader className="p-0 pb-2 flex flex-row items-center justify-between">
                    <CardTitle className="text-lg text-indigo-700 flex items-center"><BrainCircuit className="w-5 h-5 mr-2 text-green-500"/> Estilo de Comunicação (IA)</CardTitle>
-                   <Button size="sm" onClick={() => callAIFeature('style')} disabled={!aiConsentGiven || isPredictionLoading || isPoemLoading || isStyleLoading || isFlagPersonalityLoading}>
-                     {isStyleLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BrainCircuit className="mr-2 h-4 w-4"/>}
-                     Analisar
-                   </Button>
+                    <Button size="sm" onClick={() => callAIFeature('style')} disabled={!aiConsentGiven || isPredictionLoading || isPoemLoading || isStyleLoading || isFlagPersonalityLoading}>
+                      {isStyleLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BrainCircuit className="mr-2 h-4 w-4"/>}
+                      Analisar
+                    </Button>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    {isStyleLoading ? (
+                      <p className="text-gray-500 italic">Analisando estilo...</p>
+                    ) : aiStyleAnalysis ? (
+                      <p className="text-gray-700 whitespace-pre-wrap">{aiStyleAnalysis}</p>
+                    ) : (
+                      <p className="text-gray-500 italic">Clique em "Analisar" para um resumo do estilo de comunicação.</p>
+                    )}
+                  </CardContent>
+               </Card>
+             </div>
+
+             {/* Non-AI Premium Content */}
+             <h3 className="text-xl font-semibold text-purple-800 mb-3 mt-6">Outras Análises Premium</h3>
+             <div className="space-y-4">
+               {/* Passive-Aggressive Analysis Card */}
+               <Card className="bg-white p-4">
+                 <CardHeader className="p-0 pb-2">
+                   <CardTitle className="text-lg text-indigo-700 flex items-center"><Users className="w-5 h-5 mr-2 text-orange-600"/> Análise Passivo-Agressiva</CardTitle>
                  </CardHeader>
                  <CardContent className="p-0">
-                   {isStyleLoading ? (
-                     <p className="text-gray-500 italic">Analisando estilo...</p>
-                   ) : aiStyleAnalysis ? (
-                     <p className="text-gray-700 whitespace-pre-wrap">{aiStyleAnalysis}</p>
+                   {(analysisResults || loadedAnalysis) ? (
+                     <div className="space-y-3">
+                       <div className="flex justify-between items-center text-base">
+                         <span className="font-medium">Geral (% msgs):</span>
+                         <span className="font-bold text-orange-700">
+                           {((analysisResults?.passiveAggressivePercentage ?? loadedAnalysis?.passiveAggressivePercentage) || 0).toFixed(1)}%
+                         </span>
+                       </div>
+                       {Object.keys((analysisResults?.statsPerSender ?? loadedAnalysis?.statsPerSender) || {}).length > 1 && (
+                         <div>
+                           <h5 className="text-sm font-semibold mt-3 mb-1 text-gray-600">Por Participante:</h5>
+                           <ul className="list-disc list-inside text-sm space-y-1">
+                             {Object.entries(analysisResults?.statsPerSender ?? loadedAnalysis?.statsPerSender ?? {}).sort(([, a]: any, [, b]: any) => (b.passiveAggressivePercentage ?? 0) - (a.passiveAggressivePercentage ?? 0)).map(([sender, stats]: any) => (
+                               <li key={sender}>
+                                 <span className="font-medium">{sender}:</span> {(stats.passiveAggressivePercentage ?? 0).toFixed(1)}%
+                               </li>
+                             ))}
+                           </ul>
+                         </div>
+                       )}
+                     </div>
                    ) : (
-                     <p className="text-gray-500 italic">Clique em "Analisar" para um resumo do estilo de comunicação.</p>
+                     <p className="text-gray-500 italic">Dados de análise não disponíveis.</p>
                    )}
                  </CardContent>
-              </Card>
-            </div>
-
-            {/* Non-AI Premium Content */}
-            <h3 className="text-xl font-semibold text-purple-800 mb-3 mt-6">Outras Análises Premium</h3>
-            <div className="space-y-4">
-              {/* Passive-Aggressive Analysis Card */}
-              <Card className="bg-white p-4">
-                <CardHeader className="p-0 pb-2">
-                  <CardTitle className="text-lg text-indigo-700 flex items-center"><Users className="w-5 h-5 mr-2 text-orange-600"/> Análise Passivo-Agressiva</CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  {analysisResults ? (
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center text-base">
-                        <span className="font-medium">Geral (% msgs):</span>
-                        <span className="font-bold text-orange-700">{analysisResults.passiveAggressivePercentage?.toFixed(1) ?? '0.0'}%</span>
-                      </div>
-                      {Object.keys(analysisResults.statsPerSender).length > 1 && (
-                        <div>
-                          <h5 className="text-sm font-semibold mt-3 mb-1 text-gray-600">Por Participante:</h5>
-                          <ul className="list-disc list-inside text-sm space-y-1">
-                            {Object.entries(analysisResults.statsPerSender)
-                              .sort(([, a], [, b]) => (b.passiveAggressivePercentage ?? 0) - (a.passiveAggressivePercentage ?? 0))
-                              .map(([sender, stats]) => (
-                                <li key={sender}>
-                                  <span className="font-medium">{sender}:</span> {stats.passiveAggressivePercentage?.toFixed(1) ?? '0.0'}%
-                                </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-gray-500 italic">Dados de análise não disponíveis.</p>
-                  )}
-                </CardContent>
-              </Card>
+               </Card>
 
               {/* Flirtation Analysis Card */}
               <Card className="bg-white p-4">

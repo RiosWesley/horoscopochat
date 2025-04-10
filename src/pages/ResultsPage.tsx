@@ -158,6 +158,68 @@ const ResultsPage = () => {
       setErrorLoadingShared(null);
     }
   }, [analysisId, navigate]);
+  const generateHeuristics = (results: FullAnalysisResults) => {
+      let sign = "Explorador do ZapVerso ✨";
+      let signDescriptor = "";
+      let signoDescription = "Um perfil de chat equilibrado e misterioso.";
+      const funFacts: string[] = [];
+
+      if (results.mostActiveHour !== null && results.mostActiveHour !== undefined) {
+         if (results.mostActiveHour >= 22 || results.mostActiveHour < 6) { sign = `Coruja Noturna 🦉`; signoDescription = "As madrugadas são seu palco principal para conversas profundas ou divertidas."; }
+         else if (results.mostActiveHour >= 6 && results.mostActiveHour < 12) { sign = `Madrugador Tagarela ☀️`; signoDescription = "Você começa o dia com energia total no chat, resolvendo tudo logo cedo."; }
+         else if (results.mostActiveHour >= 12 && results.mostActiveHour < 18) { sign = `Vespertino Vibrante 🌇`; signoDescription = "A tarde é seu momento de ouro para interações e trocas de ideias."; }
+         else { sign = `Sereno Notívago 🌙`; signoDescription = "Prefere a calma do início da noite para colocar a conversa em dia."; }
+      }
+
+      if (results.mostFrequentEmoji && ['😂', '🤣', 'lol'].includes(results.mostFrequentEmoji)) { signDescriptor = "Comediante"; signoDescription += " Seu humor contagiante ilumina o chat!"; }
+      else if (results.mostFrequentEmoji && ['❤️', '🥰', '😍'].includes(results.mostFrequentEmoji)) { signDescriptor = "Amoroso"; signoDescription += " O afeto transborda em suas mensagens."; }
+      else if (results.mostFrequentKeywordCategory === 'positive' && results.keywordCounts.positive > results.keywordCounts.negative) { signDescriptor = "Otimista"; signoDescription += " Sempre vendo o lado bom e espalhando positividade."; }
+      else if (results.mostFrequentKeywordCategory === 'negative' && results.keywordCounts.negative > results.keywordCounts.positive) { signDescriptor = "Intenso"; signoDescription += " Você se expressa com paixão e clareza, mesmo nos momentos difíceis."; }
+      else if (results.mostFrequentKeywordCategory === 'questions') { signDescriptor = "Curioso"; signoDescription += " Sua mente está sempre buscando entender e explorar."; }
+      else if (results.mostFrequentEmoji) { signDescriptor = `do ${results.mostFrequentEmoji}`; signoDescription += ` O emoji ${results.mostFrequentEmoji} é sua marca registrada!`; }
+
+      if (signDescriptor) { sign = `${signDescriptor} ${sign}`; }
+      else if (results.mostFrequentEmoji) {
+          signDescriptor = `do ${results.mostFrequentEmoji}`;
+          sign = `${signDescriptor} ${sign}`;
+          signoDescription += ` O emoji ${results.mostFrequentEmoji} é sua marca registrada!`;
+      }
+
+      if (results.mostActiveHour !== null && results.mostActiveHour !== undefined) {
+        if (results.mostActiveHour >= 22 || results.mostActiveHour < 6) { funFacts.push("Você brilha mais quando a lua aparece no chat."); }
+        else if (results.mostActiveHour >= 12 && results.mostActiveHour < 18) { funFacts.push("A tarde é seu momento de pico nas conversas!"); }
+        else { funFacts.push("Manhãs ou noites tranquilas? Seu pico de chat é fora do comum!"); }
+      }
+
+      if (results.totalMessages > 500) { funFacts.push(`Com ${results.totalMessages} mensagens, suas conversas renderiam um bom capítulo!`); }
+      else if (results.totalMessages < 50) { funFacts.push("Direto ao ponto: poucas mensagens, muita objetividade?"); }
+      const senderCount = Object.keys(results.messagesPerSender).length;
+      if (senderCount === 1) { funFacts.push("Mestre dos monólogos digitais ou uma conversa muito focada?"); }
+      else if (senderCount > 5) { funFacts.push(`Malabarista social! Gerenciando papos com ${senderCount} participantes.`); }
+      if (results.mostFrequentEmoji) { funFacts.push(`Seu emoji ${results.mostFrequentEmoji} aparece com frequência, revelando um traço marcante!`); }
+      if (results.keywordCounts.laughter > results.keywordCounts.questions && results.keywordCounts.laughter > 5) { funFacts.push("Seu bom humor transparece nas mensagens! Muitas risadas detectadas."); }
+      else if (results.keywordCounts.questions > results.keywordCounts.laughter && results.keywordCounts.questions > 5) { funFacts.push("Curiosidade em alta! Você faz bastante perguntas."); }
+
+      if (results.averageMessageLength > 100) { funFacts.push("Você gosta de detalhar! Suas mensagens costumam ser longas."); }
+      else if (results.averageMessageLength < 20) { funFacts.push("Direto e reto! Suas mensagens são curtinhas."); }
+      else if (funFacts.length < 3) { funFacts.push("Suas mensagens têm um tamanho equilibrado, nem muito longas, nem muito curtas."); }
+      if (results.punctuationEmphasisCount > 5) { funFacts.push("Você gosta de dar ênfase!!! Isso demonstra intensidade."); }
+      else if (results.punctuationEmphasisCount > 0) { funFacts.push("Uma exclamaçãozinha extra aqui e ali para dar um toque especial!"); }
+      if (results.capsWordCount > 10) { funFacts.push("Às vezes você GRITA no chat? Notamos um uso frequente de CAPS."); }
+      else if (results.capsWordCount > 0) { funFacts.push("Um CAPS LOCK ocasional para destacar o ponto principal."); }
+      const sentimentRatio = results.keywordCounts.positive / (results.keywordCounts.negative + 1);
+      if (sentimentRatio > 2) { funFacts.push("Sua vibe é majoritariamente positiva, espalhando boas energias!"); }
+      else if (sentimentRatio < 0.5 && results.keywordCounts.negative > 3) { funFacts.push("Um toque de realismo (ou seria intensidade?) marca suas conversas."); }
+      const sortedSenders = Object.entries(results.messagesPerSender).sort(([, countA], [, countB]) => countB - countA);
+
+      if (sortedSenders.length > 2 && sortedSenders[0][1] > (results.totalMessages * 0.3)) { funFacts.push(`Parece que ${sortedSenders[0][0]} domina a conversa por aqui!`); }
+
+      const defaultFacts = ["Seu estilo de chat é único como uma impressão digital cósmica.", "Há mais segredos escondidos nas entrelinhas...", "Cada mensagem sua carrega uma energia particular."];
+      let factIndex = 0;
+      while (funFacts.length < 3 && factIndex < defaultFacts.length) { if (!funFacts.includes(defaultFacts[factIndex])) { funFacts.push(defaultFacts[factIndex]); } factIndex++; }
+
+      return { generatedSign: sign, generatedSignoDescription: signoDescription, generatedFunFacts: funFacts.slice(0, 3) };
+  };
 
   const { generatedSign: calculatedSign, generatedSignoDescription, generatedFunFacts } = useMemo(() => {
     if (analysisResults && isFullAnalysisResults(analysisResults)) {
@@ -256,67 +318,6 @@ const ResultsPage = () => {
 
   // --- Heuristics Generation ---
   // Define generateHeuristics function locally or import if moved to utils
-  const generateHeuristics = (results: FullAnalysisResults) => {
-      let sign = "Explorador do ZapVerso ✨";
-      let signDescriptor = "";
-      let signoDescription = "Um perfil de chat equilibrado e misterioso.";
-      const funFacts: string[] = [];
-
-      if (results.mostActiveHour !== null && results.mostActiveHour !== undefined) {
-         if (results.mostActiveHour >= 22 || results.mostActiveHour < 6) { sign = `Coruja Noturna 🦉`; signoDescription = "As madrugadas são seu palco principal para conversas profundas ou divertidas."; }
-         else if (results.mostActiveHour >= 6 && results.mostActiveHour < 12) { sign = `Madrugador Tagarela ☀️`; signoDescription = "Você começa o dia com energia total no chat, resolvendo tudo logo cedo."; }
-         else if (results.mostActiveHour >= 12 && results.mostActiveHour < 18) { sign = `Vespertino Vibrante 🌇`; signoDescription = "A tarde é seu momento de ouro para interações e trocas de ideias."; }
-         else { sign = `Sereno Notívago 🌙`; signoDescription = "Prefere a calma do início da noite para colocar a conversa em dia."; }
-      }
-
-      if (results.mostFrequentEmoji && ['😂', '🤣', 'lol'].includes(results.mostFrequentEmoji)) { signDescriptor = "Comediante"; signoDescription += " Seu humor contagiante ilumina o chat!"; }
-      else if (results.mostFrequentEmoji && ['❤️', '🥰', '😍'].includes(results.mostFrequentEmoji)) { signDescriptor = "Amoroso"; signoDescription += " O afeto transborda em suas mensagens."; }
-      else if (results.mostFrequentKeywordCategory === 'positive' && results.keywordCounts.positive > results.keywordCounts.negative) { signDescriptor = "Otimista"; signoDescription += " Sempre vendo o lado bom e espalhando positividade."; }
-      else if (results.mostFrequentKeywordCategory === 'negative' && results.keywordCounts.negative > results.keywordCounts.positive) { signDescriptor = "Intenso"; signoDescription += " Você se expressa com paixão e clareza, mesmo nos momentos difíceis."; }
-      else if (results.mostFrequentKeywordCategory === 'questions') { signDescriptor = "Curioso"; signoDescription += " Sua mente está sempre buscando entender e explorar."; }
-      else if (results.mostFrequentEmoji) { signDescriptor = `do ${results.mostFrequentEmoji}`; signoDescription += ` O emoji ${results.mostFrequentEmoji} é sua marca registrada!`; }
-
-      if (signDescriptor) { sign = `${signDescriptor} ${sign}`; }
-      else if (results.mostFrequentEmoji) {
-          signDescriptor = `do ${results.mostFrequentEmoji}`;
-          sign = `${signDescriptor} ${sign}`;
-          signoDescription += ` O emoji ${results.mostFrequentEmoji} é sua marca registrada!`;
-      }
-
-      if (results.mostActiveHour !== null && results.mostActiveHour !== undefined) {
-        if (results.mostActiveHour >= 22 || results.mostActiveHour < 6) { funFacts.push("Você brilha mais quando a lua aparece no chat."); }
-        else if (results.mostActiveHour >= 12 && results.mostActiveHour < 18) { funFacts.push("A tarde é seu momento de pico nas conversas!"); }
-        else { funFacts.push("Manhãs ou noites tranquilas? Seu pico de chat é fora do comum!"); }
-      }
-
-      if (results.totalMessages > 500) { funFacts.push(`Com ${results.totalMessages} mensagens, suas conversas renderiam um bom capítulo!`); }
-      else if (results.totalMessages < 50) { funFacts.push("Direto ao ponto: poucas mensagens, muita objetividade?"); }
-      const senderCount = Object.keys(results.messagesPerSender).length;
-      if (senderCount === 1) { funFacts.push("Mestre dos monólogos digitais ou uma conversa muito focada?"); }
-      else if (senderCount > 5) { funFacts.push(`Malabarista social! Gerenciando papos com ${senderCount} participantes.`); }
-      if (results.mostFrequentEmoji) { funFacts.push(`Seu emoji ${results.mostFrequentEmoji} aparece com frequência, revelando um traço marcante!`); }
-      if (results.keywordCounts.laughter > results.keywordCounts.questions && results.keywordCounts.laughter > 5) { funFacts.push("Seu bom humor transparece nas mensagens! Muitas risadas detectadas."); }
-      else if (results.keywordCounts.questions > results.keywordCounts.laughter && results.keywordCounts.questions > 5) { funFacts.push("Curiosidade em alta! Você faz bastante perguntas."); }
-      if (results.averageMessageLength > 100) { funFacts.push("Você gosta de detalhar! Suas mensagens costumam ser longas."); }
-      else if (results.averageMessageLength < 20) { funFacts.push("Direto e reto! Suas mensagens são curtinhas."); }
-      else if (funFacts.length < 3) { funFacts.push("Suas mensagens têm um tamanho equilibrado, nem muito longas, nem muito curtas."); }
-      if (results.punctuationEmphasisCount > 5) { funFacts.push("Você gosta de dar ênfase!!! Isso demonstra intensidade."); }
-      else if (results.punctuationEmphasisCount > 0) { funFacts.push("Uma exclamaçãozinha extra aqui e ali para dar um toque especial!"); }
-      if (results.capsWordCount > 10) { funFacts.push("Às vezes você GRITA no chat? Notamos um uso frequente de CAPS."); }
-      else if (results.capsWordCount > 0) { funFacts.push("Um CAPS LOCK ocasional para destacar o ponto principal."); }
-      const sentimentRatio = results.keywordCounts.positive / (results.keywordCounts.negative + 1);
-      if (sentimentRatio > 2) { funFacts.push("Sua vibe é majoritariamente positiva, espalhando boas energias!"); }
-      else if (sentimentRatio < 0.5 && results.keywordCounts.negative > 3) { funFacts.push("Um toque de realismo (ou seria intensidade?) marca suas conversas."); }
-      const sortedSenders = Object.entries(results.messagesPerSender).sort(([, countA], [, countB]) => countB - countA);
-      if (sortedSenders.length > 2 && sortedSenders[0][1] > (results.totalMessages * 0.3)) { funFacts.push(`Parece que ${sortedSenders[0][0]} domina a conversa por aqui!`); }
-
-      const defaultFacts = ["Seu estilo de chat é único como uma impressão digital cósmica.", "Há mais segredos escondidos nas entrelinhas...", "Cada mensagem sua carrega uma energia particular."];
-      let factIndex = 0;
-      while (funFacts.length < 3 && factIndex < defaultFacts.length) { if (!funFacts.includes(defaultFacts[factIndex])) { funFacts.push(defaultFacts[factIndex]); } factIndex++; }
-
-      return { generatedSign: sign, generatedSignoDescription: signoDescription, generatedFunFacts: funFacts.slice(0, 3) };
-  };
-// Removed duplicate useMemo and variable declarations below
 
   // Update context only if we calculated the sign from context data
   useEffect(() => {
@@ -1074,7 +1075,7 @@ const ResultsPage = () => {
               </motion.div>
             )}
             {/* Button to navigate to the dedicated premium area (only if not shared link AND premium mock is active) */}
-            {!analysisId && isPremiumMock && (
+            {isPremiumShared && (
               <div className="mt-4 mb-2 flex justify-center">
                 <Button
                   onClick={() => navigate('/premium')}

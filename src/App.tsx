@@ -30,7 +30,7 @@ const App = () => (
             <Route path="/analyzing" element={<AnalyzingPage />} />
             {/* Updated route to accept optional analysisId */}
             <Route path="/results/:analysisId?" element={<ResultsPage />} />
-            <Route path="/premium" element={<PremiumPage />} /> {/* Add premium route */}
+            <Route path="/premium/:analysisId" element={<PremiumPage />} /> {/* Add premium route com analysisId */}
             <Route path="/payment/:analysisId" element={<PaymentPage />} /> {/* Add payment route */}
             <Route path="*" element={<NotFound />} />
           </Routes>

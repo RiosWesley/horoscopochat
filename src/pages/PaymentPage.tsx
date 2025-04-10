@@ -31,6 +31,8 @@ import {
   Lock
 } from "lucide-react";
 import { useChatAnalysis } from "@/context/ChatAnalysisContext";
+import { getFirestore, doc, updateDoc } from "firebase/firestore";
+ 
 
 declare global {
   interface Window {
@@ -195,15 +197,28 @@ const [identificationNumber, setIdentificationNumber] = useState<string>("");
               console.log("Simulando processamento de pagamento com cartão...");
               await new Promise(resolve => setTimeout(resolve, 2000));
               console.log("Simulação de pagamento com cartão concluída.");
+              try {
+                const db = getFirestore();
+                const analysisRef = doc(db, 'sharedAnalyses', analysisId!);
+                await updateDoc(analysisRef, { isPremiumAnalysis: true });
+                console.log("Campo isPremiumAnalysis atualizado para true no Firestore.");
+              } catch (error) {
+                console.error("Erro ao atualizar status premium no Firestore:", error);
+                toast({
+                  title: "Erro ao ativar premium",
+                  description: "Seu pagamento foi aprovado, mas houve um problema ao ativar o premium. Tente novamente ou contate o suporte.",
+                  variant: "destructive",
+                });
+                return;
+              }
+
               toast({
                 title: "Pagamento com Cartão Aprovado!",
                 description: "Seu acesso premium foi ativado com sucesso.",
                 variant: "default",
               });
-              if (analysisId) {
-                localStorage.setItem(`premium_paid_${analysisId}`, "true");
-              }
-              navigate(`/premium?analysisId=${analysisId}`);
+
+              navigate(`/results/${analysisId}`);
             } catch (err: any) {
               console.error("Erro no onSubmit do CardForm:", err);
               setError(err.message || "Erro ao processar pagamento com cartão.");
