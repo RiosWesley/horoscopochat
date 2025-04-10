@@ -121,7 +121,10 @@ const PremiumPage: React.FC = () => {
   const [isPoemLoading, setIsPoemLoading] = useState(false);
   const [isStyleLoading, setIsStyleLoading] = useState(false);
   const [isFlagPersonalityLoading, setIsFlagPersonalityLoading] = useState(false); // Add loading state for flag personality
-  const [aiConsentGiven, setAiConsentGiven] = useState(false); // State for AI consent
+  const [aiConsentGiven, setAiConsentGiven] = useState<boolean>(() => {
+    const saved = localStorage.getItem('aiConsentGiven');
+    return saved === 'true';
+  });
 
   // State to track last call timestamp for each feature
   const [lastCallTimestamps, setLastCallTimestamps] = useState<Record<AiFeatureType, number>>({

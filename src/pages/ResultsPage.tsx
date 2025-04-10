@@ -189,6 +189,29 @@ const ResultsPage = () => {
     else setTimeOfDay('Boa noite');
   }, [analysisId, contextParsedMessages, isLoading, error, navigate, analysisResults]);
 
+  // Gera um ID local único para análises locais sem ID
+  useEffect(() => {
+    if (!analysisId && !context.localAnalysisId) {
+      const newId = `local-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+      context.setLocalAnalysisId(newId);
+      console.log("Gerado localAnalysisId:", newId);
+    }
+  }, [analysisId, context]);
+
+  // Verifica no localStorage se a análise foi paga e ativa premium automaticamente
+  useEffect(() => {
+    if (!analysisId) return;
+    const paid = localStorage.getItem(`premium_paid_${analysisId}`);
+    if (paid === "true" && !isPremium) {
+      try {
+        context.setIsPremium(true);
+        console.log("Premium ativado automaticamente via localStorage");
+      } catch (e) {
+        console.warn("Falha ao ativar premium via localStorage", e);
+      }
+    }
+  }, [analysisId, isPremium, context]);
+
 
   // --- Heuristics Generation ---
   // Define generateHeuristics function locally or import if moved to utils
@@ -1026,7 +1049,20 @@ const ResultsPage = () => {
                <ResultCard title="Desbloqueie Análises Premium ✨" variant="accent">
                  <div className="text-center py-4">
                    <p className="mb-3">Obtenha insights sobre flerte, passivo-agressividade, IA e mais com o Premium!</p>
-                   <Button onClick={handlePremiumClick} size="sm" className="bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white">Ver Vantagens Premium</Button>
+                   <Button
+                     onClick={() => {
+                       const id = analysisId || context.localAnalysisId;
+                       if (id) {
+                         navigate(`/payment/${id}`);
+                       } else {
+                         toast.error("ID da análise não encontrado.");
+                       }
+                     }}
+                     size="sm"
+                     className="bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white"
+                   >
+                     Ativar Premium
+                   </Button>
                  </div>
                </ResultCard>
              </motion.div>

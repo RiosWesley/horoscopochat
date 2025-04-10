@@ -38,6 +38,9 @@ interface ChatAnalysisContextType {
   setSelectedSender: (sender: string | null) => void; // Add setter for the selected sender
   aiFlagPersonalityAnalysis: Record<string, string> | null; // Add state for AI flag personality analysis
   setAiFlagPersonalityAnalysis: (analysis: Record<string, string> | null) => void; // Add setter
+
+  localAnalysisId: string | null;
+  setLocalAnalysisId: (id: string | null) => void;
 }
 
 const ChatAnalysisContext = createContext<ChatAnalysisContextType | undefined>(undefined);
@@ -63,6 +66,8 @@ export const ChatAnalysisProvider: React.FC<ChatAnalysisProviderProps> = ({ chil
   const [generatedSign, setGeneratedSign] = useState<string | null>(null); // Initialize generated sign state
   const [selectedSender, setSelectedSender] = useState<string | null>(null); // Initialize selected sender state
   const [aiFlagPersonalityAnalysis, setAiFlagPersonalityAnalysis] = useState<Record<string, string> | null>(null); // Initialize AI flag analysis state
+
+  const [localAnalysisId, setLocalAnalysisId] = useState<string | null>(null);
 
   // Function to reset the analysis state
   const resetAnalysis = () => {
@@ -118,7 +123,9 @@ export const ChatAnalysisProvider: React.FC<ChatAnalysisProviderProps> = ({ chil
     setSelectedSender, // Provide selected sender setter
     aiFlagPersonalityAnalysis, // Provide AI flag analysis state
     setAiFlagPersonalityAnalysis, // Provide AI flag analysis setter
-  };
+   localAnalysisId,
+   setLocalAnalysisId,
+ };
 
   return (
     <ChatAnalysisContext.Provider value={value}>

@@ -1,0 +1,206 @@
+Eu não posso acessar diretamente o site da Mercado Pago ou suas subpáginas em tempo real para coletar a documentação completa do Checkout API (anteriormente conhecido como Checkout Transparente) como você solicitou. No entanto, posso fornecer uma visão geral detalhada e precisa com base nas informações disponíveis até o momento sobre o Checkout API, conforme descrito na documentação oficial da Mercado Pago e outras fontes confiáveis. Vou estruturar isso de forma clara e abrangente, cobrindo os principais aspectos que você encontraria nas subpáginas da documentação oficial.
+
+Se você precisar de algo mais específico ou de um trecho exato de uma subpágina, por favor, me diga qual seção você quer que eu aprofunde, e eu farei o meu melhor para ajudar com base no que sei até abril de 2025!
+
+---
+
+# Documentação Completa do Checkout API (Checkout Transparente) - Mercado Pago
+
+O Checkout API do Mercado Pago é uma solução de pagamento que permite processar transações diretamente no ambiente da sua loja online, sem redirecionar o cliente para uma página externa. Ele oferece controle total sobre a experiência de pagamento, integração personalizada e suporte aos principais métodos de pagamento disponíveis no mercado. Abaixo está a documentação consolidada com base nas seções típicas encontradas em `https://www.mercadopago.com.br/developers/pt/docs/checkout-api/landing` e suas subpáginas.
+
+---
+
+## 1. Introdução ao Checkout API
+
+### O que é o Checkout API?
+O Checkout API (anteriormente referido como Checkout Transparente) permite que o processo de compra — desde o preenchimento dos dados do cliente até a confirmação do pagamento — ocorra dentro do ambiente da sua loja online. Ele é ideal para quem deseja uma integração personalizada, mantendo a identidade visual da marca e otimizando a experiência do usuário.
+
+### Benefícios
+- **Compra em um único ambiente**: O cliente não é redirecionado para fora da loja, o que melhora a conversão.
+- **Customização**: Controle total sobre o design e a experiência do frontend.
+- **Segurança**: Compatível com PCI DSS para processamento seguro de dados sensíveis.
+- **Múltiplos meios de pagamento**: Suporte a cartões de crédito, débito, Pix, boleto e outros métodos locais, dependendo do país.
+- **Comunicação personalizada**: Mensagens de erro e status ajustáveis para o cliente.
+
+---
+
+## 2. Primeiros Passos
+
+### Requisitos
+- **Conta no Mercado Pago**: Crie uma conta de vendedor no Mercado Pago.
+- **Credenciais**: Gere suas credenciais de aplicação (Client ID, Client Secret e Access Token) no painel do Mercado Pago.
+- **Ambiente de testes**: Use o ambiente sandbox para simular transações antes de ir para produção.
+
+### Configuração Inicial
+1. **Obtenha suas credenciais**:
+   - Acesse o painel do Mercado Pago → "Suas integrações" → "Credenciais".
+   - Copie o `Public Key` (para frontend) e o `Access Token` (para backend).
+2. **Escolha o método de integração**:
+   - Via SDKs (recomendado para simplicidade).
+   - Via chamadas diretas à API REST.
+
+---
+
+## 3. Integração do Checkout API
+
+### Fluxo Básico
+1. **Coleta de dados no frontend**: Use o `Public Key` para tokenizar os dados do cartão do cliente com o MercadoPago.js.
+2. **Envio ao backend**: Passe o token gerado para o seu servidor.
+3. **Processamento do pagamento**: Use o `Access Token` para criar o pagamento via API REST.
+4. **Retorno ao cliente**: Exiba o resultado (aprovado, rejeitado, etc.) na interface.
+
+### Passo a Passo
+
+#### 3.1. Instalação do MercadoPago.js (Frontend)
+Adicione o script no seu HTML:
+```html
+<script src="https://sdk.mercadopago.com/js/v2"></script>
+```
+Inicialize o SDK com sua `Public Key`:
+```javascript
+const mp = new MercadoPago('SUA_PUBLIC_KEY');
+```
+
+#### 3.2. Tokenização de Cartão
+Crie um formulário para coletar os dados do cartão e gere um token:
+```javascript
+const cardForm = mp.cardForm({
+  amount: "100.00",
+  autoMount: true,
+  form: {
+    id: "form-checkout",
+    cardholderName: { id: "form-checkout__cardholderName" },
+    cardNumber: { id: "form-checkout__cardNumber" },
+    expirationDate: { id: "form-checkout__expirationDate" },
+    securityCode: { id: "form-checkout__securityCode" },
+    installments: { id: "form-checkout__installments" },
+    identificationType: { id: "form-checkout__identificationType" },
+    identificationNumber: { id: "form-checkout__identificationNumber" },
+  },
+  callbacks: {
+    onFormMounted: error => { if (error) console.log("Erro ao montar formulário"); },
+    onSubmit: event => {
+      event.preventDefault();
+      mp.cardForm.createCardToken(cardForm)
+        .then(cardToken => {
+          // Envie o cardToken para o backend
+          processPayment(cardToken.id);
+        })
+        .catch(error => console.log("Erro ao gerar token: ", error));
+    },
+  },
+});
+```
+
+#### 3.3. Criação do Pagamento (Backend)
+No seu servidor, use o `Access Token` para criar o pagamento via API:
+```bash
+curl -X POST \
+  'https://api.mercadopago.com/v1/payments' \
+  -H 'Authorization: Bearer SEU_ACCESS_TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "transaction_amount": 100,
+    "token": "TOKEN_GERADO_NO_FRONTEND",
+    "description": "Produto Exemplo",
+    "installments": 1,
+    "payment_method_id": "visa",
+    "payer": {
+      "email": "cliente@example.com",
+      "identification": {
+        "type": "CPF",
+        "number": "12345678900"
+      }
+    }
+  }'
+```
+**Resposta esperada**:
+```json
+{
+  "id": 123456789,
+  "status": "approved",
+  "transaction_amount": 100,
+  ...
+}
+```
+
+---
+
+## 4. Meios de Pagamento Disponíveis
+
+O Checkout API suporta diversos métodos, dependendo do país:
+- **Brasil**: Cartão de crédito/débito (Visa, Mastercard, etc.), Pix, Boleto Bancário.
+- **Outros países**: PSE (Colômbia), OXXO (México), etc.
+
+### Configuração de Meios de Pagamento
+1. Consulte os métodos disponíveis:
+   ```bash
+   curl -X GET \
+     'https://api.mercadopago.com/v1/payment_methods' \
+     -H 'Authorization: Bearer SEU_ACCESS_TOKEN'
+   ```
+2. Use o `payment_method_id` retornado (ex.: "visa", "pix") na criação do pagamento.
+
+---
+
+## 5. Personalização e Customização
+
+### Checkout Bricks
+O Checkout Bricks é uma alternativa ao Checkout API puro, oferecendo módulos de UI prontos (como formulário de cartão, seleção de parcelas, etc.) que podem ser integrados ao fluxo transparente. Exemplo:
+```javascript
+const bricksBuilder = mp.bricks();
+bricksBuilder.create("cardPayment", "container", {
+  initialization: { amount: 100 },
+  callbacks: {
+    onSubmit: cardToken => processPayment(cardToken),
+  },
+});
+```
+
+### Comunicação Personalizada
+Exiba mensagens customizadas com base no `status` retornado pela API (ex.: "approved", "rejected").
+
+---
+
+## 6. Testes e Validação
+
+### Ambiente Sandbox
+- Use credenciais de teste fornecidas no painel.
+- Teste com cartões fictícios (disponíveis na documentação oficial).
+
+### Exemplos de Cartões de Teste (Brasil)
+- Visa: `5031 4332 1540 6351`, CVV: `123`, Validade: `11/25`.
+- Status específico: Veja a lista completa na documentação.
+
+---
+
+## 7. Segurança
+
+- **PCI DSS**: O Checkout API é elegível ao processo SAQ A, garantindo segurança no processamento.
+- **Tokenização**: Dados sensíveis são convertidos em tokens, nunca armazenados diretamente no seu servidor.
+- **HTTPS**: Todas as chamadas à API devem usar HTTPS.
+
+---
+
+## 8. Referências Técnicas
+
+### Endpoints Principais
+- **Criação de pagamento**: `POST /v1/payments`
+- **Consulta de métodos de pagamento**: `GET /v1/payment_methods`
+- **Reembolsos**: `POST /v1/payments/{id}/refunds`
+
+### SDKs Disponíveis
+- **JavaScript**: MercadoPago.js
+- **Backend**: SDKs para Node.js, PHP, Java, Python, Ruby, etc.
+
+---
+
+## 9. Suporte e Comunidade
+
+- **Documentação Oficial**: Acesse o site developers.mercadopago.com.br.
+- **Comunidade**: Participe do Discord oficial do Mercado Pago para dúvidas e troca de experiências.
+- **Suporte Técnico**: Contate o time via painel ou e-mail.
+
+---
+
+Essa é uma visão consolidada da documentação do Checkout API baseada em informações típicas da página oficial e suas subseções. Se precisar de mais detalhes sobre uma subpágina específica (como "Configuração de Meios de Pagamento" ou "Checkout Bricks"), posso expandir ainda mais! O que acha?
