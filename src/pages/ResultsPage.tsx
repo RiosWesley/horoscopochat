@@ -1235,12 +1235,12 @@ const ResultsPage = () => {
           <Separator className="bg-white/20 my-4" />
           <div className="text-center">
              <p className="font-semibold mb-2">Plano Premium:</p>
-             <p className="text-lg font-bold">R$ 5,00 <span className="text-xs font-normal opacity-80">/ análise única</span></p>
+             <p className="text-lg font-bold">R$ 1,99 <span className="text-xs font-normal opacity-80">/ análise única</span></p>
              {/* <p className="text-lg font-bold mt-1">R$ 29,90 <span className="text-xs font-normal opacity-80">/ mês (ilimitado)</span></p> */}
           </div>
           <DialogFooter className="mt-6 sm:justify-center">
             <Button onClick={handleSubscribe} className="w-full sm:w-auto bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white font-bold shadow-lg">
-              Desbloquear Análise (R$ 5,00)
+              Desbloquear Análise (R$ 1,99)
             </Button>
           </DialogFooter>
            <Button variant="ghost" size="icon" className="absolute top-4 right-4 text-purple-200 hover:text-white" onClick={() => setShowPremium(false)}>
