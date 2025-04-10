@@ -145,7 +145,7 @@ const PremiumPage: React.FC = () => {
 
       try {
         const db = getFirestore(firebaseApp);
-        const docRef = doc(db, 'analyses', analysisId);
+        const docRef = doc(db, 'sharedAnalyses', analysisId);
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {

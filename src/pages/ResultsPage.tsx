@@ -1078,7 +1078,7 @@ const ResultsPage = () => {
             {isPremiumShared && (
               <div className="mt-4 mb-2 flex justify-center">
                 <Button
-                  onClick={() => navigate('/premium')}
+                  onClick={() => navigate(`/premium/${analysisId}`)}
                   className="bg-gradient-to-r from-cosmic-purple to-cosmic-pink hover:from-cosmic-purple/90 hover:to-cosmic-pink/90 text-white font-semibold py-2 px-6 rounded-lg shadow-md transition-all duration-300 ease-in-out transform hover:scale-105"
                 >
                   Ver Área Premium Completa ✨
