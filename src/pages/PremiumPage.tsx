@@ -10,7 +10,7 @@ import { ArrowLeft, BrainCircuit, Feather, Sparkles, Loader2, Users, Smile, Hear
 import { useChatAnalysis } from '@/context/ChatAnalysisContext';
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { firebaseApp } from '@/firebaseConfig';
-import { getFirestore, doc, getDoc } from "firebase/firestore";
+import { getFirestore, doc, getDoc, updateDoc } from "firebase/firestore";
 import { toast } from 'sonner'; // Import toast
 import type { ParsedMessage } from '../lib/parseChat'; // Import ParsedMessage type
 
@@ -149,7 +149,14 @@ const PremiumPage: React.FC = () => {
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
-          setLoadedAnalysis(docSnap.data());
+          const data = docSnap.data();
+          setLoadedAnalysis(data);
+
+          // Carregar insights premium salvos, se existirem
+          if (data.aiPrediction) setAiPrediction(data.aiPrediction);
+          if (data.aiPoem) setAiPoem(data.aiPoem);
+          if (data.aiStyleAnalysis) setAiStyleAnalysis(data.aiStyleAnalysis);
+          if (data.aiFlagPersonalityAnalysis) setAiFlagPersonalityAnalysis(data.aiFlagPersonalityAnalysis);
         } else {
           console.error('Análise não encontrada no Firestore');
         }
@@ -159,7 +166,7 @@ const PremiumPage: React.FC = () => {
     };
 
     fetchAnalysis();
-  }, [analysisId, analysisResults]);
+  }, [analysisId, analysisResults, setAiPrediction, setAiPoem, setAiStyleAnalysis, setAiFlagPersonalityAnalysis]);
 
   const callAIFeature = useCallback(async (featureType: AiFeatureType) => {
     const now = Date.now();
@@ -313,6 +320,26 @@ const PremiumPage: React.FC = () => {
 
       // Timestamp already updated at the start of the successful attempt
       toast.success(`${featureType.charAt(0).toUpperCase() + featureType.slice(1)} gerado com sucesso!`);
+
+      // Salvar resultado no Firestore
+      try {
+        if (analysisId) {
+          const db = getFirestore(firebaseApp);
+          const analysisRef = doc(db, 'sharedAnalyses', analysisId);
+
+          let updateData: Record<string, any> = {};
+
+          if (featureType === 'prediction') updateData.aiPrediction = (result?.data as any)?.result?.trim();
+          else if (featureType === 'poem') updateData.aiPoem = (result?.data as any)?.result?.trim();
+          else if (featureType === 'style') updateData.aiStyleAnalysis = (result?.data as any)?.result?.trim();
+          else if (featureType === 'flagPersonality') updateData.aiFlagPersonalityAnalysis = (result?.data as any)?.result;
+
+          await updateDoc(analysisRef, updateData);
+          console.log(`Insight ${featureType} salvo no Firestore.`);
+        }
+      } catch (error) {
+        console.error(`Erro ao salvar ${featureType} no Firestore:`, error);
+      }
 
     } catch (error: any) {
        // Timestamp should have been reverted inside the try block for specific errors
