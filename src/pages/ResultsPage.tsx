@@ -293,13 +293,6 @@ const ResultsPage = () => {
   }, [analysisId, loadedResults, contextParsedMessages, isLoading, error, navigate, analysisResults]);
 
   // Gera um ID local único para análises locais sem ID
-  useEffect(() => {
-    if (!analysisId && !context.localAnalysisId) {
-      const newId = `local-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-      context.setLocalAnalysisId(newId);
-      console.log("Gerado localAnalysisId:", newId);
-    }
-  }, [analysisId, context]);
 
   // Verifica no localStorage se a análise foi paga e ativa premium automaticamente
   useEffect(() => {
@@ -1110,11 +1103,11 @@ const ResultsPage = () => {
                    <p className="mb-3">Obtenha insights sobre flerte, passivo-agressividade, IA e mais com o Premium!</p>
                    <Button
                      onClick={() => {
-                       const id = analysisId || context.localAnalysisId;
+                       const id = analysisId;
                        if (id) {
                          navigate(`/payment/${id}`);
                        } else {
-                         toast.error("ID da análise não encontrado.");
+                         toast.error("Primeiro aperte em `Salvar e Compartilhar'.");
                        }
                      }}
                      size="sm"
@@ -1161,14 +1154,14 @@ const ResultsPage = () => {
           </div>
         )}
 
-        {/* Temporary Button to Toggle Premium Mock Status (Hide if shared link) */}
+        {/* Temporary Button to Toggle Premium Mock Status (Hide if shared link) 
         {!analysisId && (
           <div className="my-4 flex justify-center">
              <Button onClick={() => setIsPremiumMock(!isPremiumMock)} variant="outline" size="sm">
                {isPremiumMock ? 'Desativar Premium (Teste)' : 'Ativar Premium (Teste)'}
              </Button>
           </div>
-        )}
+        )}*/}
 
         {/* Bottom Buttons */}
          <div className="mt-8 mb-4">
@@ -1239,7 +1232,17 @@ const ResultsPage = () => {
              {/* <p className="text-lg font-bold mt-1">R$ 29,90 <span className="text-xs font-normal opacity-80">/ mês (ilimitado)</span></p> */}
           </div>
           <DialogFooter className="mt-6 sm:justify-center">
-            <Button onClick={handleSubscribe} className="w-full sm:w-auto bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white font-bold shadow-lg">
+            <Button
+              onClick={() => {
+                const id = analysisId;
+                if (id) {
+                  navigate(`/payment/${id}`);
+                } else {
+                  toast.error("Primeiro aperte em `Salvar e Gerar Link'.");
+                }
+              }}
+              className="w-full sm:w-auto bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white font-bold shadow-lg"
+            >
               Desbloquear Análise (R$ 1,99)
             </Button>
           </DialogFooter>
